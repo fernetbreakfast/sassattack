@@ -204,7 +204,7 @@
   .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
 
   /* PIN gate (client-side only) */
-  .pinDots{ display:flex; gap:16px; justify-content:center; margin:18px 0 6px; }
+  .pinDots{ display:flex; gap:12px; justify-content:center; margin:18px 0 6px; flex-wrap:nowrap; }
   .pinDot{ width:16px; height:16px; border-radius:50%; border:2px solid rgba(0,224,255,.4);
     background:transparent; transition:.15s; }
   .pinDot.on{ background:var(--neon); border-color:var(--neon); box-shadow:0 0 14px rgba(0,224,255,.6); }
@@ -366,9 +366,9 @@
   <div class="overlay show" id="pinGate" style="z-index:40;">
     <div class="card">
       <h1 style="font-size:40px;">GYUH</h1>
-      <p class="sub">Locked. Enter the 4-digit PIN to play.</p>
+      <p class="sub">Locked. Enter the 6-digit PIN to play.</p>
       <div class="pinDots" id="pinDots">
-        <span class="pinDot"></span><span class="pinDot"></span><span class="pinDot"></span><span class="pinDot"></span>
+        <span class="pinDot"></span><span class="pinDot"></span><span class="pinDot"></span><span class="pinDot"></span><span class="pinDot"></span><span class="pinDot"></span>
       </div>
       <p class="pinErr" id="pinErr">&nbsp;</p>
       <div class="keypad" id="keypad">
@@ -1078,9 +1078,9 @@
      check both live in the page source where anyone can read them. The gate
      only keeps casual visitors out; never put anything sensitive behind it. */
   (function pinGate(){
-    const PIN = '1025';
+    const PIN = '102595';
     // The PIN is required on EVERY load of /mem/ — we deliberately do NOT
-    // persist the unlock in localStorage, so the player re-enters 1025 each
+    // persist the unlock in localStorage, so the player re-enters 102595 each
     // time the page is opened.
     const gate = $('pinGate');
     if(!gate) return;
@@ -1101,9 +1101,9 @@
       const btn = e.target.closest('.key'); if(!btn) return;
       const k = btn.dataset.k;
       if(k === 'del'){ entry = entry.slice(0,-1); errEl.textContent = '\u00a0'; renderDots(); return; }
-      if(!k || entry.length >= 4) return;
+      if(!k || entry.length >= 6) return;
       entry += k; errEl.textContent = '\u00a0'; renderDots();
-      if(entry.length === 4){
+      if(entry.length === 6){
         setTimeout(() => { if(entry === PIN){ unlock(); } else { reject(); } }, 140);
       }
     });

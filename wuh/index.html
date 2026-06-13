@@ -235,7 +235,7 @@
   const SCORE_TOKEN     = 'thesasshastheass';
 
   /* ===== TUNABLE SCORING / TIMER CONSTANTS (easy to tweak) ===== */
-  const QUESTION_SECONDS = 15;        // countdown per question
+  const QUESTION_SECONDS = 20;        // countdown per question
   const MAX_Q_POINTS     = 1000000;   // points for an instant correct answer
   const MIN_Q_POINTS     = 100000;    // floor: slowest correct answer still earns this
   const WINNER_BONUS     = 1000000;   // flat end-of-game bonus added to the winner's total
@@ -457,7 +457,7 @@ SEPDX | The Sellwood neighborhood, named for Reverend John Sellwood, was origina
       const parts = t.split(' | ').map(p => p.trim());
       if(parts.length !== 7) return;
       const letter = parts[6].replace('correct:', '').trim().toUpperCase();
-      out.push({ show: parts[0], q: parts[1], opts: [parts[2], parts[3], parts[4], parts[5]], correct: {A:0,B:1,C:2,D:3}[letter] });
+      out.push({ id: out.length, show: parts[0], q: parts[1], opts: [parts[2], parts[3], parts[4], parts[5]], correct: {A:0,B:1,C:2,D:3}[letter] });
     });
     return out;
   }
@@ -497,15 +497,53 @@ SEPDX | The Sellwood neighborhood, named for Reverend John Sellwood, was origina
   let suddenDeath = false;
   let sdRound = 0, sdStarter = 0, sdTurns = [], sdIdx = 0, sdRoundScore = [0,0];
 
-  // FIX (duplicates): an explicit "used this match" set guarantees no question repeats
-  // anywhere in a match — main rounds AND sudden death — instead of relying on a pointer.
+  /* ===== CROSS-GAME DEDUP (4-game window) =====================================
+     Persist the question-ID sets of the last 3 games in localStorage. A new
+     match excludes the union of those 3 sets, so the new game + previous 3 form
+     a 4-game window with zero repeats. Each question's stable ID is its index
+     in BANK (q.id). Fallback: if excluding leaves < 10 available, fill from the
+     least-recently-used questions so it can never crash. Within-match uniqueness
+     (main rounds AND sudden death) is still guaranteed by usedThisMatch.
+     ============================================================================ */
+  const RECENT_KEY = 'wuh_recent_games';   // JSON: array (oldest..newest, max 3) of id-arrays
+  const RECENT_GAMES = 3;
+  function loadRecent(){
+    try{ const v = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]'); return Array.isArray(v) ? v.filter(Array.isArray) : []; }
+    catch(e){ return []; }
+  }
+  function saveRecent(arr){ try{ localStorage.setItem(RECENT_KEY, JSON.stringify(arr)); }catch(e){} }
+  function recordGame(ids){
+    const recent = loadRecent();
+    recent.push(ids.slice());
+    while(recent.length > RECENT_GAMES) recent.shift();
+    saveRecent(recent);
+  }
+  // Ordered candidate list for a match: eligible (not in last-3 window) first,
+  // shuffled; then the rest ordered least-recently-used first (random tiebreak).
+  function buildAvailableQueue(){
+    const recent = loadRecent();
+    const excludeIds = new Set();
+    const recency = new Map();               // id -> most-recent game position (0=oldest)
+    recent.forEach((g, gi) => g.forEach(id => { excludeIds.add(id); recency.set(id, gi); }));
+    const eligible = BANK.filter(q => !excludeIds.has(q.id));
+    const rest     = BANK.filter(q =>  excludeIds.has(q.id));
+    const primary  = shuffle(eligible);
+    const lruRest  = shuffle(rest).sort((a, b) => (recency.get(a.id) || 0) - (recency.get(b.id) || 0));
+    return primary.concat(lruRest);          // length === BANK.length, all unique
+  }
+
   let usedThisMatch = new Set();
+  let availableQueue = [];
+  let thisGameIds = [];
   function draw(){
-    let pool = BANK.filter(q => !usedThisMatch.has(q));
-    if(pool.length === 0){ usedThisMatch = new Set(); pool = BANK.slice(); } // only if a match somehow exceeds the whole bank
-    const q = pool[Math.floor(Math.random()*pool.length)];
-    usedThisMatch.add(q);
-    return q;
+    // Pull the next still-unused question from the prepared queue (eligible-first, LRU fallback).
+    while(availableQueue.length){
+      const q = availableQueue.shift();
+      if(!usedThisMatch.has(q)){ usedThisMatch.add(q); return q; }
+    }
+    // Ultra-safety: a single match longer than the whole bank — rebuild and continue.
+    usedThisMatch = new Set(); availableQueue = buildAvailableQueue();
+    const q = availableQueue.shift(); usedThisMatch.add(q); return q;
   }
 
   /* ===== current-question / re-entrancy guards (FIX: early-end + double-fire) ===== */
@@ -588,6 +626,7 @@ SEPDX | The Sellwood neighborhood, named for Reverend John Sellwood, was origina
   function beginMatch(){
     players[0].score=0; players[1].score=0;
     usedThisMatch = new Set();
+    availableQueue = buildAvailableQueue();   // excludes the last-3-games' questions when possible
     starter = Math.random() < 0.5 ? 0 : 1;   // random initial lead, then alternate each round
     turns = [];
     for(let r=0;r<5;r++){
@@ -595,6 +634,7 @@ SEPDX | The Sellwood neighborhood, named for Reverend John Sellwood, was origina
       turns.push({ player:first, q:draw() });   // each draw is unique within the match
       turns.push({ player:1-first, q:draw() });
     }
+    thisGameIds = turns.map(t => t.q.id);     // the 10 main questions, recorded into cross-game history at match end
     tIdx = 0; suddenDeath = false;
     updateHud();
     nextTurn();
@@ -721,6 +761,7 @@ SEPDX | The Sellwood neighborhood, named for Reverend John Sellwood, was origina
 
   function declareWinner(winIdx){
     suddenDeath = false;
+    recordGame(thisGameIds);                  // append this game's 10 IDs; history trims to last 3
     players[winIdx].score += WINNER_BONUS;    // flat winner bonus
     updateHud();
     const w = players[winIdx];

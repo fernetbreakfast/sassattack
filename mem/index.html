@@ -40,8 +40,9 @@
     -webkit-background-clip:text; background-clip:text; color:transparent;
     text-shadow:0 0 18px rgba(255,59,107,.25);
   }
-  .hud-stats{ display:flex; gap:14px; align-items:center; font-size:clamp(12px,3.6vw,15px); font-variant-numeric:tabular-nums; }
+  .hud-stats{ display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; justify-content:center; font-size:clamp(12px,3.6vw,15px); font-variant-numeric:tabular-nums; }
   .hud-stats b{ color:var(--gold); }
+  .lives{ color:var(--hot); letter-spacing:2px; font-size:clamp(13px,4vw,16px); }
   .home-btn{ position:fixed; top:max(8px,env(safe-area-inset-top)); left:8px; z-index:6;
     width:38px; height:34px; display:grid; place-items:center; cursor:pointer; text-decoration:none;
     border-radius:10px; font-size:16px; line-height:1;
@@ -194,6 +195,19 @@
   .key:active{ transform:scale(.94); background:rgba(0,224,255,.2); }
   .key.blank{ visibility:hidden; }
   .card.shake{ animation:shake .35s ease; }
+
+  /* SNL trivia revive */
+  .triviaQ{ font-size:clamp(16px,4.6vw,19px); font-weight:900; line-height:1.4; margin:6px 0 16px; color:#fff; }
+  .triviaOpts{ display:flex; flex-direction:column; gap:10px; }
+  .trivOpt{ -webkit-tap-highlight-color:transparent; cursor:pointer; text-align:left;
+    display:flex; gap:10px; align-items:flex-start; width:100%;
+    padding:14px 16px; border-radius:14px; font-family:inherit; font-size:15px; font-weight:700; line-height:1.35;
+    color:#fff; border:1px solid rgba(0,224,255,.3); background:rgba(0,224,255,.07);
+    transition:transform .06s, background .1s, border-color .1s; }
+  .trivOpt:active{ transform:scale(.98); background:rgba(0,224,255,.2); }
+  .trivOpt .lett{ color:var(--gold); font-weight:900; flex:0 0 auto; }
+  .trivOpt.right{ border-color:var(--grn); background:rgba(55,255,176,.18); }
+  .trivOpt.wrong{ border-color:var(--hot); background:rgba(255,59,107,.18); }
 </style>
 </head>
 <body>
@@ -202,8 +216,10 @@
   <div class="hud">
     <div class="hud-top"><span class="hud-title">GYUH?</span></div>
     <div class="hud-stats">
-      <span>RND <b id="roundEl">0</b></span>
       <span id="modeTag">&#127859;</span>
+      <span class="lives" id="livesEl" aria-label="lives">&#9829;</span>
+      <span>RND <b id="roundEl">0</b></span>
+      <span>SCORE <b id="scoreEl">0</b></span>
       <span>BEST <b id="bestEl">0</b></span>
       <span>HI <b id="hiEl">0</b></span>
     </div>
@@ -280,7 +296,7 @@
     <div class="card">
       <h1 id="goTitle" style="font-size:38px;">GAME OVER</h1>
       <p class="sub" id="goMsg">The demon remembers better than you.</p>
-      <p style="font-size:15px;margin:6px 0;">Reached round <b id="goScore" style="color:var(--gold);">0</b></p>
+      <p style="font-size:15px;margin:6px 0;">Score <b id="goScore" style="color:var(--gold);">0</b> pts</p>
       <div class="lb-head">TOP 10</div>
       <ol class="scoreList" id="goScores"><li class="muted">Loading&hellip;</li></ol>
       <div class="row">
@@ -306,6 +322,16 @@
         <button class="btn" id="hsRight">&#9654;</button>
       </div>
       <button class="cta" id="hsSaveBtn" style="margin-top:14px;">SAVE</button>
+    </div>
+  </div>
+
+  <!-- SNL TRIVIA REVIVE (shown once per game when lives hit 0) -->
+  <div class="overlay" id="trivia" style="z-index:30;">
+    <div class="card">
+      <h1 style="font-size:26px;">SNL SECOND CHANCE</h1>
+      <p class="sub">Out of lives! Answer correctly to earn one more &mdash; one shot only.</p>
+      <p class="triviaQ" id="trivQ">&nbsp;</p>
+      <div class="triviaOpts" id="trivOpts"></div>
     </div>
   </div>
 
@@ -359,7 +385,7 @@
     set(k,v){ try{ localStorage.setItem(k,v); }catch{} }
   };
 
-  const BEST_KEY = 'sassmory_best_v1', NAME_KEY = 'sassmory_initials';
+  const BEST_KEY = 'gyuh_best_v2', NAME_KEY = 'sassmory_initials';  // v2 key: million-point scale
 
   const $ = id => document.getElementById(id);
 
@@ -373,9 +399,12 @@
 
   /* ===== MODES ===== */
   const MODES = {
-    easy: { e:'🍳', name:'EASY',   n:3, flashOn:620, flashGap:300, retries:1 },
-    mid:  { e:'🌶', name:'MIDDLE', n:4, flashOn:460, flashGap:200, retries:0 },
-    hard: { e:'💀', name:'HARD',   n:5, flashOn:330, flashGap:130, retries:0 }
+    // lives = number of wrong taps the player can survive before game over.
+    // One extra life per difficulty step: easy 1, middle 2, hard 3.
+    // (These numbers are easy to change.)
+    easy: { e:'🍳', name:'EASY',   n:3, flashOn:620, flashGap:300, lives:1 },
+    mid:  { e:'🌶', name:'MIDDLE', n:4, flashOn:460, flashGap:200, lives:2 },
+    hard: { e:'💀', name:'HARD',   n:5, flashOn:330, flashGap:130, lives:3 }
   };
   let modeKey = store.get('sassmory_mode') || 'easy';
   if(!MODES[modeKey]) modeKey = 'easy';
@@ -419,6 +448,7 @@
   const pickOne = a => a[Math.floor(Math.random()*a.length)];
 
   /* ===== STATE ===== */
+  const POINTS_PER_ROUND = 1000000; // each successfully completed round = 1,000,000 points
   let N = 3;                 // grid side
   let total = 9;             // tiles
   let sequence = [];         // order of tile indices
@@ -429,7 +459,11 @@
   let highName = (store.get(NAME_KEY) || '').toUpperCase().slice(0,3);
   let acceptingInput = false;
   let playing = false;
-  let retriesLeft = 0;
+  let livesLeft = 0;         // wrong taps remaining before game over (set per mode)
+  let cleared = 0;           // rounds fully reproduced this game
+  let score = 0;             // cleared * POINTS_PER_ROUND
+  let triviaUsed = false;    // SNL trivia revive may be offered only ONCE per game
+  let pendingBadTile = null; // tile that triggered the potential game over
   let runId = '';
   let revealed = [];         // booleans: which tiles are permanently revealed
   let tileEls = [];          // tile DOM nodes
@@ -449,6 +483,11 @@
   const bestEl   = $('bestEl');
   const hiEl     = $('hiEl');
   const modeTag  = $('modeTag');
+  const scoreEl  = $('scoreEl');
+  const livesEl  = $('livesEl');
+  // number formatters for the million-point scale
+  const fmtFull  = n => Number(n||0).toLocaleString('en-US');           // 5,000,000
+  const fmtShort = n => { n = Number(n||0); return n >= 1e6 ? (n/1e6).toLocaleString('en-US',{maximumFractionDigits:2}) + 'M' : fmtFull(n); };
 
   const startOv  = $('start');
   const startBtn = $('startBtn');
@@ -459,8 +498,9 @@
   const scoresOv = $('scores');
   const goOv     = $('gameOver');
   const hsOv     = $('hsModal');
+  const trivOv   = $('trivia');
 
-  bestEl.textContent = String(best);
+  bestEl.textContent = fmtShort(best);
   modeTag.textContent = MODE.e;
 
   function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
@@ -596,13 +636,83 @@
   }
 
   /* ===== ROUND FLOW ===== */
+  /* ===== SNL TRIVIA REVIVE =====
+     Vetted question bank — answers are verified; do not invent new ones.
+     Offered exactly ONCE per game (triviaUsed). Correct -> +1 life and replay
+     the failed round; wrong -> game over and the score posts as normal. */
+  const TRIVIA = [
+    { q:'What year did Saturday Night Live first premiere?', opts:{A:'1972',B:'1975',C:'1980',D:'1968'}, correct:'B' },
+    { q:'Who created Saturday Night Live?', opts:{A:'Lorne Michaels',B:'Dick Ebersol',C:'Chevy Chase',D:'Dan Aykroyd'}, correct:'A' },
+    { q:'How does every SNL episode open?', opts:{A:'"It\'s Saturday Night Live!"',B:'"Live from New York, it\'s Saturday Night!"',C:'"Welcome to Saturday Night."',D:'"And now... SNL."'}, correct:'B' },
+    { q:'In the "More Cowbell" sketch, who played producer Bruce Dickinson?', opts:{A:'Will Ferrell',B:'Christopher Walken',C:'Chris Kattan',D:'Jimmy Fallon'}, correct:'B' },
+    { q:'Which SNL sketch, later a hit film, featured Wayne and Garth?', opts:{A:'Coneheads',B:'Night at the Roxbury',C:"Wayne\'s World",D:'MacGruber'}, correct:'C' },
+    { q:'Who played the character Stefon on Weekend Update?', opts:{A:'Bill Hader',B:'Fred Armisen',C:'Andy Samberg',D:'Bobby Moynihan'}, correct:'A' },
+    { q:'"Dick in a Box" and "Lazy Sunday" were created by which SNL group?', opts:{A:"Please Don\'t Destroy",B:'The Lonely Island',C:'The State',D:'Stefon & Friends'}, correct:'B' },
+    { q:'How did Chevy Chase open Weekend Update?', opts:{A:'"Live from New York..."',B:'"I\'m Chevy Chase, and you\'re not."',C:'"Well, isn\'t that special?"',D:'"Two wild and crazy guys."'}, correct:'B' },
+    { q:'Eddie Murphy was a breakout SNL star during which decade?', opts:{A:'1970s',B:'1980s',C:'1990s',D:'2000s'}, correct:'B' },
+    { q:'Which Gilda Radner character ended her rants with "Never mind"?', opts:{A:'Emily Litella',B:'The Church Lady',C:'Debbie Downer',D:'Roseanne Roseannadanna'}, correct:'A' },
+    { q:'Who played "The Church Lady"?', opts:{A:'Dana Carvey',B:'Mike Myers',C:'Phil Hartman',D:'Will Ferrell'}, correct:'A' },
+    { q:'"Debbie Downer" was played by which cast member?', opts:{A:'Molly Shannon',B:'Maya Rudolph',C:'Rachel Dratch',D:'Kristen Wiig'}, correct:'C' },
+    { q:'In the Coneheads sketches, the family secretly came from which planet?', opts:{A:'Melmac',B:'Remulak',C:'Mars',D:'Krypton'}, correct:'B' },
+    { q:'Which former SNL Weekend Update anchor became host of The Tonight Show?', opts:{A:'Seth Meyers',B:"Conan O\'Brien",C:'Jimmy Fallon',D:'Jimmy Kimmel'}, correct:'C' }
+  ];
+  const TRIV_LETTERS = ['A','B','C','D'];
+  function escapeHtml(t){ const d=document.createElement('div'); d.textContent=String(t); return d.innerHTML; }
+  function openTrivia(){
+    triviaUsed = true; // offered only ONCE per game (win or lose)
+    const item = TRIVIA[Math.floor(Math.random() * TRIVIA.length)];
+    // Build display options. Keep the given A-D order; for EASY only, shuffle
+    // the positions so the correct letter is randomized.
+    let entries = TRIV_LETTERS.map(L => ({ text:item.opts[L], correct: L === item.correct }));
+    if(modeKey === 'easy'){
+      for(let k=entries.length-1;k>0;k--){ const j=Math.floor(Math.random()*(k+1)); const tmp=entries[k]; entries[k]=entries[j]; entries[j]=tmp; }
+    }
+    $('trivQ').textContent = item.q;
+    const wrap = $('trivOpts'); wrap.innerHTML = '';
+    let answered = false;
+    entries.forEach((e, idx) => {
+      const btn = document.createElement('button');
+      btn.className = 'trivOpt'; btn.type = 'button';
+      btn.innerHTML = '<span class="lett">' + TRIV_LETTERS[idx] + ')</span><span>' + escapeHtml(e.text) + '</span>';
+      btn.addEventListener('click', () => {
+        if(answered) return; answered = true;
+        if(e.correct){
+          btn.classList.add('right'); blip(660,'sine',0.14,0.4);
+          setTimeout(() => { trivOv.classList.remove('show'); reviveContinue(); }, 650);
+        } else {
+          btn.classList.add('wrong'); sfxFail();
+          const kids = wrap.children;
+          for(let k=0;k<kids.length;k++){ if(entries[k].correct) kids[k].classList.add('right'); }
+          setTimeout(() => { trivOv.classList.remove('show'); gameOver(pendingBadTile); }, 1200);
+        }
+      });
+      wrap.appendChild(btn);
+    });
+    trivOv.classList.add('show');
+  }
+
+  /* ===== HUD: lives + score ===== */
+  function renderLives(){
+    const max = MODE.lives, on = Math.max(0, livesLeft);
+    livesEl.textContent = '\u2665'.repeat(on) + '\u2661'.repeat(Math.max(0, max - on));
+  }
+  function renderScore(){
+    score = cleared * POINTS_PER_ROUND;
+    scoreEl.textContent = fmtShort(score);
+    if(score > best){ best = score; store.set(BEST_KEY, String(best)); }
+    bestEl.textContent = fmtShort(best);
+  }
+
   function startGame(){
     ac(); // unlock audio on user gesture
     runId = Date.now().toString(36) + Math.random().toString(36).slice(2,10);
     // User photo wins; otherwise rotate one of the bundled defaults.
     gameImg = imgReady ? imgEl : pickDefault();
     buildGrid();
-    sequence = []; round = 0; retriesLeft = MODE.retries;
+    sequence = []; round = 0;
+    cleared = 0; score = 0;
+    livesLeft = MODE.lives; triviaUsed = false; pendingBadTile = null;
+    renderLives(); renderScore();
     playing = true;
     startOv.classList.remove('show');
     nextRound();
@@ -629,22 +739,42 @@
       if(inputIdx >= sequence.length){
         acceptingInput = false;
         sfxWin();
-        if(round > best){ best = round; store.set(BEST_KEY, String(best)); bestEl.textContent = String(best); }
+        cleared++;          // a full round successfully reproduced
+        renderScore();      // score = cleared * 1,000,000 (also updates BEST)
         nextRound();
       }
     } else {
-      if(retriesLeft > 0){
-        retriesLeft--;
-        const tile = tileEls[i]; tile.classList.add('wrong');
-        setTimeout(() => tile.classList.remove('wrong'), 320);
-        sfxFail();
-        setCaption('Wrong! One retry — watch again.', 'hot');
-        acceptingInput = false;
-        setTimeout(() => playSequence(), 900);
-      } else {
-        gameOver(i);
-      }
+      loseLife(i);          // a wrong tap costs one life (and may end the game)
     }
+  }
+
+  // A wrong tap costs one life. With lives left, the round is replayed.
+  // When lives hit 0, the one-time SNL trivia revive is offered (if unused);
+  // otherwise the game ends.
+  function loseLife(badTile){
+    livesLeft--; renderLives();
+    pendingBadTile = badTile;
+    const tile = tileEls[badTile];
+    if(tile){ tile.classList.add('wrong'); setTimeout(() => tile.classList.remove('wrong'), 320); }
+    sfxFail();
+    if(livesLeft > 0){
+      setCaption('Wrong! ' + livesLeft + ' \u2665 left — watch again.', 'hot');
+      acceptingInput = false;
+      setTimeout(() => playSequence(), 900);
+    } else {
+      acceptingInput = false;
+      gridEl.classList.add('locked');
+      if(!triviaUsed){ openTrivia(); }   // SNL second chance, once per game
+      else { gameOver(badTile); }
+    }
+  }
+  // Correct trivia answer -> grant ONE life and replay the failed round.
+  function reviveContinue(){
+    livesLeft = 1; renderLives();
+    setCaption('Saved by SNL! One more shot — watch again.', 'good');
+    acceptingInput = false;
+    gridEl.classList.remove('locked');
+    setTimeout(() => playSequence(), 800);
   }
 
   function gameOver(badTile){
@@ -655,19 +785,19 @@
     }
     sfxFail();
     gridEl.classList.add('locked');
-    finishRun(round); // score = sequence length attempted when you failed
+    finishRun(cleared * POINTS_PER_ROUND); // score = completed rounds * 1,000,000
   }
 
-  async function finishRun(score){
-    $('goScore').textContent = String(score);
+  async function finishRun(finalScore){
+    $('goScore').textContent = fmtFull(finalScore);
     $('goTitle').textContent = 'GAME OVER';
     $('goMsg').textContent = pickOne(TAUNTS_FAIL);
-    if(score > best){ best = score; store.set(BEST_KEY, String(best)); bestEl.textContent = String(best); }
+    if(finalScore > best){ best = finalScore; store.set(BEST_KEY, String(best)); bestEl.textContent = fmtShort(best); }
     goOv.classList.add('show');
     renderTop($('goScores'));
-    postHighScore(score);
-    if(await qualifies(score)){
-      pendingScore = score;
+    postHighScore(finalScore);
+    if(await qualifies(finalScore)){
+      pendingScore = finalScore;
       setTimeout(() => openInitials(), 400);
     }
   }
@@ -764,7 +894,7 @@
       const mE = MODE_EMOJI[row.mode] || '';
       const a = document.createElement('span');
       a.innerHTML = '<span class="rank">' + (i+1) + '.</span> <span class="modeBadge">' + mE + '</span>' + ini;
-      const b = document.createElement('b'); b.textContent = row.score || 0;
+      const b = document.createElement('b'); b.textContent = fmtFull(row.score || 0);
       li.append(a,b);
       if(highlight && !marked && Math.round(row.score) === Math.round(highlight.score) && ini === (highlight.initials||'---').toUpperCase().slice(0,3)){
         li.classList.add('me'); marked = true;

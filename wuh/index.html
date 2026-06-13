@@ -28,7 +28,6 @@
   }
   body{ min-height:100%; height:100svh; height:100dvh; overflow:hidden; }
 
-  /* full-screen stacked screens */
   .screen{
     position:fixed; inset:0; display:none; flex-direction:column; align-items:center;
     padding:max(18px,env(safe-area-inset-top)) 18px max(18px,env(safe-area-inset-bottom));
@@ -70,7 +69,7 @@
     animation:slotPulse 1.1s ease-in-out infinite; }
   @keyframes slotPulse{ 0%,100%{ box-shadow:0 0 22px rgba(255,59,107,.5); } 50%{ box-shadow:0 0 30px rgba(255,59,107,.85); } }
 
-  /* custom on-screen keyboard (no native OS keyboard) */
+  /* custom on-screen keyboard (QWERTY, no native OS keyboard) */
   .kbd{ display:flex; flex-direction:column; gap:6px; align-items:stretch; margin:6px 0 2px; width:100%; }
   .kbd-row{ display:flex; gap:5px; justify-content:center; }
   .key2{ -webkit-tap-highlight-color:transparent; cursor:pointer; flex:1 1 0; min-width:0;
@@ -96,7 +95,16 @@
   .pname{ font-size:14px; font-weight:900; letter-spacing:1px; }
   .pcard.p1 .pname{ color:var(--p1); } .pcard.p2 .pname{ color:var(--p2); }
   .pscore{ font-size:clamp(16px,5.5vw,22px); font-weight:900; }
-  .roundtag{ text-align:center; color:#aeb6e0; font-size:12px; letter-spacing:1px; margin:2px 0 8px; }
+  .roundtag{ text-align:center; color:#aeb6e0; font-size:12px; letter-spacing:1px; margin:2px 0 6px; }
+
+  /* timer */
+  .timer{ width:min(94vw,520px); display:flex; align-items:center; gap:10px; margin:0 auto 8px; }
+  .timer-track{ flex:1; height:12px; border-radius:7px; background:rgba(255,255,255,.08); overflow:hidden; }
+  .timer-bar{ height:100%; width:100%; background:linear-gradient(90deg,var(--grn),var(--neon)); }
+  .timer.low .timer-bar{ background:linear-gradient(90deg,var(--gold),var(--hot)); }
+  .timer-num{ min-width:34px; text-align:right; font-size:15px; font-weight:900; letter-spacing:.5px; color:#aeb6e0; font-variant-numeric:tabular-nums; }
+  .timer.low .timer-num{ color:var(--hot); animation:pulseNum .5s ease-in-out infinite; }
+  @keyframes pulseNum{ 0%,100%{ transform:scale(1); } 50%{ transform:scale(1.18); } }
 
   .qshow{ font-size:12px; font-weight:900; letter-spacing:2px; color:var(--neon); text-transform:uppercase; }
   .qtext{ font-size:clamp(18px,5.6vw,24px); font-weight:900; line-height:1.3; margin:4px 0 6px; }
@@ -117,6 +125,14 @@
   .winner-ini{ font-size:clamp(40px,16vw,84px); font-weight:900; letter-spacing:4px; }
   .pickgrid{ display:flex; flex-direction:column; gap:12px; width:100%; }
   .foot{ color:#8b93c0; font-size:12px; letter-spacing:.5px; }
+
+  /* mute toggle */
+  .mute{ position:fixed; top:max(10px,env(safe-area-inset-top)); right:12px; z-index:90;
+    -webkit-tap-highlight-color:transparent; width:44px; height:44px; border-radius:50%;
+    display:grid; place-items:center; font-size:20px; cursor:pointer;
+    border:1px solid rgba(0,224,255,.4); background:rgba(10,14,34,.7); color:#fff; }
+  .mute:active{ transform:scale(.92); }
+
   .toast{
     position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px);
     background:rgba(10,14,34,.92); border:1px solid rgba(255,59,107,.5); color:#fff;
@@ -127,11 +143,13 @@
 </head>
 <body>
 
+  <button class="mute" id="muteBtn" aria-label="Toggle sound">&#128266;</button>
+
   <!-- TITLE -->
   <section class="screen show" id="scrTitle">
     <div class="wrap">
       <h1 class="title">WUH?</h1>
-      <p class="sub">Two players. One phone. Five rounds of TV trivia.<br>Loser passes the phone. Winner gets the glory.</p>
+      <p class="sub">Two players. One phone. Five rounds of TV trivia.<br>Answer fast for more points. Loser passes the phone.</p>
       <button class="cta" id="btnStart">Start</button>
       <p class="foot">&#129370; sassybreakfa.st &middot; hot-seat trivia</p>
     </div>
@@ -165,6 +183,7 @@
       <div class="pcard p2" id="card1"><div class="pname" id="pn1">P2</div><div class="pscore" id="ps1">0</div></div>
     </div>
     <div class="roundtag" id="roundTag">ROUND 1 of 5</div>
+    <div class="timer" id="timer"><div class="timer-track"><div class="timer-bar" id="timerBar"></div></div><div class="timer-num" id="timerNum">15</div></div>
     <div class="wrap" style="gap:10px; margin-top:0;">
       <div class="qshow" id="qShow">SNL</div>
       <div class="qtext" id="qText">Question</div>
@@ -210,11 +229,21 @@
   'use strict';
   const $ = id => document.getElementById(id);
 
-  /* ===== leaderboard endpoints (reward lands on the chosen game's board) ===== */
+  /* ===== leaderboard endpoints (winner reward lands on the chosen game's board) ===== */
   const SCORE_ENDPOINT  = 'https://api.sassybreakfa.st/log/hscore.php';
   const SCORES_ENDPOINT = 'https://api.sassybreakfa.st/log/leaderboard.php';
   const SCORE_TOKEN     = 'thesasshastheass';
-  const BONUS           = 1000000;
+
+  /* ===== TUNABLE SCORING / TIMER CONSTANTS (easy to tweak) ===== */
+  const QUESTION_SECONDS = 15;        // countdown per question
+  const MAX_Q_POINTS     = 1000000;   // points for an instant correct answer
+  const MIN_Q_POINTS     = 100000;    // floor: slowest correct answer still earns this
+  const WINNER_BONUS     = 1000000;   // flat end-of-game bonus added to the winner's total
+  const REWARD_POINTS    = 1000000;   // flat cross-game reward entry posted under winner's initials
+  // speed score for a CORRECT answer with `secondsLeft` remaining:
+  function scoreFor(secondsLeft){
+    return Math.max(MIN_Q_POINTS, Math.round(MAX_Q_POINTS * secondsLeft / QUESTION_SECONDS));
+  }
 
   function fetchT(url, opts = {}, ms = 3500){
     const c = new AbortController();
@@ -231,7 +260,114 @@
     try{ if(screen.orientation&&screen.orientation.lock){ const po=screen.orientation.lock('portrait'); if(po&&po.catch) po.catch(()=>{}); } }catch(e){}
   }
 
-  /* ===== question bank — 50 vetted questions, embedded verbatim ===== */
+  /* =====================================================================
+     AUDIO — all synthesized via Web Audio (no audio files).
+     SFX: select / correct / wrong / timeout / transition / win.
+     Bed: a low drone + a tick that speeds up & rises in pitch as time runs low.
+     Master mute toggle persisted in localStorage ('wuh_muted').
+     ===================================================================== */
+  const AudioFX = (() => {
+    let ctx = null, master = null;
+    let muted = false;
+    try{ muted = localStorage.getItem('wuh_muted') === '1'; }catch(e){}
+
+    function ensure(){
+      if(ctx) return ctx;
+      try{
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if(!AC) return null;
+        ctx = new AC();
+        master = ctx.createGain();
+        master.gain.value = muted ? 0 : 0.9;
+        master.connect(ctx.destination);
+      }catch(e){ ctx = null; }
+      return ctx;
+    }
+    function resume(){ try{ if(ctx && ctx.state === 'suspended') ctx.resume(); }catch(e){} }
+
+    // one shaped tone
+    function tone(freq, dur, type, peak, slideTo, delay){
+      if(!ensure() || muted) return;
+      const t = ctx.currentTime + (delay || 0);
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = type || 'sine';
+      o.frequency.setValueAtTime(freq, t);
+      if(slideTo){ o.frequency.exponentialRampToValueAtTime(Math.max(1, slideTo), t + dur); }
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(peak || 0.18, t + 0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(master);
+      o.start(t); o.stop(t + dur + 0.03);
+    }
+    function chord(freqs, dur, type, peak, delay){ freqs.forEach(f => tone(f, dur, type, peak, null, delay)); }
+    function arp(freqs, step, dur, type, peak){ freqs.forEach((f, i) => tone(f, dur, type, peak, null, i * step)); }
+
+    // --- SFX ---
+    const select     = () => tone(620, 0.06, 'square', 0.10);
+    const correct    = () => arp([523.25, 659.25, 783.99, 1046.5], 0.07, 0.18, 'sine', 0.16);     // C E G C ↑
+    const wrong      = () => { tone(190, 0.30, 'sawtooth', 0.22, 90); tone(140, 0.32, 'square', 0.14, 70, 0.02); }; // buzzer
+    const timeout    = () => arp([440, 330, 247, 165], 0.10, 0.22, 'triangle', 0.18);             // descending
+    const transition = () => tone(480, 0.09, 'triangle', 0.11, 760);
+    const win        = () => { arp([523.25, 659.25, 783.99, 1046.5, 1318.5], 0.11, 0.26, 'sine', 0.18);
+                               chord([523.25, 783.99, 1046.5], 0.6, 'sine', 0.12, 0.55); };       // fanfare + chord
+
+    // --- background bed + countdown tick ---
+    let drone = null, droneGain = null, tickTimer = null, bedOn = false, getLeft = null;
+    function startBed(getLeftFn){
+      stopBed();
+      getLeft = getLeftFn; bedOn = true;
+      if(!ensure()) return;
+      try{
+        drone = ctx.createOscillator(); droneGain = ctx.createGain();
+        drone.type = 'sine'; drone.frequency.value = 55;        // sub bass pad
+        droneGain.gain.value = muted ? 0 : 0.05;
+        drone.connect(droneGain); droneGain.connect(master);
+        drone.start();
+      }catch(e){}
+      scheduleTick();
+    }
+    function scheduleTick(){
+      if(!bedOn) return;
+      const left = getLeft ? getLeft() : QUESTION_SECONDS;
+      const frac = Math.max(0, Math.min(1, left / QUESTION_SECONDS));  // 1 = full time, 0 = out
+      // interval shrinks 560ms -> 130ms; pitch rises as time runs low
+      const interval = 130 + frac * 430;
+      if(!muted){
+        const t = ctx.currentTime;
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'square';
+        o.frequency.value = 300 + (1 - frac) * 560;
+        const peak = 0.05 + (1 - frac) * 0.08;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(peak, t + 0.005);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.085);
+        o.connect(g); g.connect(master);
+        o.start(t); o.stop(t + 0.1);
+      }
+      tickTimer = setTimeout(scheduleTick, interval);
+    }
+    function stopBed(){
+      bedOn = false;
+      if(tickTimer){ clearTimeout(tickTimer); tickTimer = null; }
+      if(drone){
+        try{ const t = ctx.currentTime; droneGain.gain.setTargetAtTime(0.0001, t, 0.04); drone.stop(t + 0.2); }catch(e){}
+        drone = null; droneGain = null;
+      }
+    }
+
+    function setMuted(m){
+      muted = m;
+      try{ localStorage.setItem('wuh_muted', m ? '1' : '0'); }catch(e){}
+      if(master) master.gain.value = m ? 0 : 0.9;
+      if(droneGain) droneGain.gain.value = m ? 0 : 0.05;
+    }
+
+    return { ensure, resume, isMuted: () => muted, setMuted,
+             select, correct, wrong, timeout, transition, win,
+             startBed, stopBed };
+  })();
+
+  /* ===== question bank — 77 vetted questions, embedded verbatim ===== */
   const BANK_RAW = `
 SNL | Who hosted the very first SNL episode in October 1975? | A) Chevy Chase | B) George Carlin | C) Richard Pryor | D) Steve Martin | correct:B
 SNL | Who were the musical guests on SNL's first-ever episode? | A) Billy Preston & Janis Ian | B) Simon & Garfunkel | C) Patti Smith & Paul Simon | D) ABBA | correct:A
@@ -283,9 +419,36 @@ WIRE | Season 2 of The Wire focused on which Baltimore institution? | A) The doc
 WIRE | Detective Jimmy McNulty was played by which (British) actor? | A) Dominic West | B) Idris Elba | C) Aidan Gillen | D) Dominic Cooper | correct:A
 WIRE | A much-quoted line about the drug trade is "The game is ___." | A) the game | B) over | C) rigged | D) everything | correct:A
 WIRE | The recovering-addict informant who helps the detail is named? | A) Bubbles | B) Bodie | C) Wallace | D) Cutty | correct:A
+SNL | Who was the first SNL cast member to die, in 1982? | A) John Belushi | B) Gilda Radner | C) Phil Hartman | D) Chris Farley | correct:A
+SNL | Which cast member was nicknamed "The Glue" for holding sketches together? | A) Phil Hartman | B) Kevin Nealon | C) Jon Lovitz | D) Dana Carvey | correct:A
+SNL | Who delivered the very first "Live from New York, it's Saturday Night!"? | A) Chevy Chase | B) John Belushi | C) George Carlin | D) Dan Aykroyd | correct:A
+SNL | Jon Lovitz played which recurring character(s)? | A) Tommy Flanagan the Pathological Liar | B) Mr. Subliminal | C) Master Thespian | D) Both A and C | correct:D
+TPB | The boys live in which fictional trailer park? | A) Sunnyvale | B) Shady Acres | C) Sunny Pines | D) Dartmouth Downs | correct:A
+TPB | Julian is almost always holding what in his hand? | A) A rum and coke | B) A beer | C) A cigarette | D) A cheeseburger | correct:A
+TPB | Ricky's beat-up car is nicknamed? | A) The Shitmobile | B) The Rustbucket | C) The Goof Wagon | D) The Sunnyvale Special | correct:A
+TPB | Bubbles is best known for his love of? | A) His cats (kitties) | B) Dogs | C) Birds | D) Fish | correct:A
+TPB | Mr. Lahey, the trailer-park supervisor, is a former? | A) Police officer | B) Teacher | C) Lawyer | D) Soldier | correct:A
+TPB | Lahey's shirtless, cheeseburger-loving assistant is named? | A) Randy | B) Cory | C) Trevor | D) Sam | correct:A
+TPB | Trailer Park Boys is set in which Canadian province? | A) Nova Scotia | B) Ontario | C) Quebec | D) Alberta | correct:A
+IDUH | "I'm Dying Up Here" is set in the stand-up scene of which era and city? | A) 1970s Los Angeles | B) 1980s New York | C) 1960s Chicago | D) 1990s Boston | correct:A
+IDUH | The tough club owner Goldie was played by? | A) Melissa Leo | B) Edie Falco | C) Allison Janney | D) Jean Smart | correct:A
+IDUH | Which comedy star executive-produced the show, drawing on his own club days? | A) Jim Carrey | B) Jerry Seinfeld | C) Adam Sandler | D) Eddie Murphy | correct:A
+IDUH | Goldie's club was largely patterned after which real LA institution? | A) The Comedy Store | B) The Improv | C) The Laugh Factory | D) Caroline's | correct:A
+IDUH | "I'm Dying Up Here" originally aired on which network? | A) Showtime | B) HBO | C) AMC | D) FX | correct:A
+PLURIBUS | "Pluribus" was created by which Breaking Bad / Better Call Saul showrunner? | A) Vince Gilligan | B) Peter Gould | C) David Chase | D) Nic Pizzolatto | correct:A
+PLURIBUS | The series streams on which platform? | A) Apple TV+ | B) Netflix | C) HBO Max | D) AMC+ | correct:A
+PLURIBUS | Who stars as novelist Carol Sturka? | A) Rhea Seehorn | B) Anna Gunn | C) Betsy Brandt | D) Jessica Chastain | correct:A
+PLURIBUS | In the premise, an alien "virus" turns humanity into a content ___ that the immune must resist? | A) hive mind | B) zombie horde | C) robot army | D) doomsday cult | correct:A
+PLURIBUS | The show is pitched as "the most miserable person on Earth" who must save the world from ___? | A) happiness | B) war | C) aliens | D) silence | correct:A
+SEPDX | SE Portland's Hawthorne Boulevard is named for Dr. James Hawthorne, who founded an early ___ in the area? | A) asylum (mental hospital) | B) brewery | C) railroad | D) cathedral | correct:A
+SEPDX | Before being renamed in 1888, Hawthorne Boulevard was called ___ after the institution on it? | A) Asylum Avenue | B) Salmon Street | C) Stephens Road | D) Powell Lane | correct:A
+SEPDX | The historic Bagdad Theater opened on Hawthorne Boulevard in which decade? | A) 1920s | B) 1940s | C) 1900s | D) 1960s | correct:A
+SEPDX | Oaks Amusement Park, opened in 1905, sits along the river in which SE Portland neighborhood? | A) Sellwood | B) Hawthorne | C) Montavilla | D) Brooklyn | correct:A
+SEPDX | SE Portland's Mount Tabor is notable for being a ___ within city limits? | A) extinct volcano (cinder cone) | B) waterfall | C) glacier | D) hot spring | correct:A
+SEPDX | The Sellwood neighborhood, named for Reverend John Sellwood, was originally a separate ___ before joining Portland? | A) town/city | B) county | C) military fort | D) reservation | correct:A
 `;
 
-  // Parse pipe-delimited lines into {show, q, opts[4], correct}. Option order is preserved.
+  // Parse pipe-delimited lines into {show, q, opts[4], correct}. Option order preserved (never shuffled).
   function parseBank(raw){
     const out = [];
     raw.split('\n').forEach(line => {
@@ -293,12 +456,8 @@ WIRE | The recovering-addict informant who helps the detail is named? | A) Bubbl
       if(!t) return;
       const parts = t.split(' | ').map(p => p.trim());
       if(parts.length !== 7) return;
-      const show = parts[0];
-      const q = parts[1];
-      const opts = [parts[2], parts[3], parts[4], parts[5]]; // "A) ...", "B) ...", etc — kept in order
       const letter = parts[6].replace('correct:', '').trim().toUpperCase();
-      const correct = {A:0,B:1,C:2,D:3}[letter];
-      out.push({ show, q, opts, correct });
+      out.push({ show: parts[0], q: parts[1], opts: [parts[2], parts[3], parts[4], parts[5]], correct: {A:0,B:1,C:2,D:3}[letter] });
     });
     return out;
   }
@@ -308,50 +467,76 @@ WIRE | The recovering-addict informant who helps the detail is named? | A) Bubbl
 
   /* ===== flavor text ===== */
   const PASS_FLAVOR = [
-    'No peeking, cheaters never WUH.',
-    'Hand it over. Gently. It bites.',
-    'Your time to shine, or to whiff. Probably whiff.',
-    'The phone has chosen you.',
-    'Eyes on the prize, brain in gear.',
-    'Don\'t embarrass yourself. Or do, it\'s funnier.'
+    'No peeking, cheaters never WUH.', 'Hand it over. Gently. It bites.',
+    'Your time to shine, or to whiff. Probably whiff.', 'The phone has chosen you.',
+    'Eyes on the prize, brain in gear.', 'Don\'t embarrass yourself. Or do, it\'s funnier.'
   ];
   const RIGHT_FLAVOR = [
-    'A MILLION POINTS. Filthy.',
-    'Correct! The crowd goes mild.',
-    'Big brain energy. +1,000,000.',
-    'You absolute trivia gremlin. Nailed it.',
-    'Money. Straight cash. A million of it.'
+    'Correct! Speed pays.', 'Big brain energy.', 'You absolute trivia gremlin. Nailed it.',
+    'Money. Straight cash.', 'Fast AND right. Show-off.'
   ];
   const WRONG_FLAVOR = [
-    'Nope. Zero dollars. Zero cents.',
-    'Wrong. The sass is disappointed.',
-    'Swing and a miss, slugger.',
-    'That\'s a no from the judges.',
-    'Bold guess. Wildly incorrect.'
+    'Nope. Zero dollars. Zero cents.', 'Wrong. The sass is disappointed.',
+    'Swing and a miss, slugger.', 'That\'s a no from the judges.', 'Bold guess. Wildly incorrect.'
+  ];
+  const TIMEOUT_FLAVOR = [
+    'Too slow! The clock wins.', 'Time\'s up. Brain.exe stopped responding.',
+    'You froze. The phone is judging you.', 'Zero. The countdown showed no mercy.'
   ];
   const WIN_FLAVOR = [
-    'Undisputed. Lord of the couch.',
-    'Champion of the hot seat.',
-    'The other one is still crying. Ignore them.',
-    'Bow before the trivia monarch.',
-    'Certified WUH.'
+    'Undisputed. Lord of the couch.', 'Champion of the hot seat.',
+    'The other one is still crying. Ignore them.', 'Bow before the trivia monarch.', 'Certified WUH.'
   ];
   const pick = a => a[Math.floor(Math.random()*a.length)];
 
   /* ===== state ===== */
   const players = [{ini:'AAA',score:0},{ini:'AAA',score:0}];
-  let deck = [];          // shuffled bank, draw pointer based
-  let drawPtr = 0;
-  let turns = [];         // [{player, q}] length 10
+  let turns = [];           // [{player, q}] length 10 for the main match
   let tIdx = 0;
-  let starter = 0;        // who leads round 1 (alternates each round)
+  let starter = 0;          // who leads round 1 (alternates each round)
   let suddenDeath = false;
   let sdRound = 0, sdStarter = 0, sdTurns = [], sdIdx = 0, sdRoundScore = [0,0];
 
+  // FIX (duplicates): an explicit "used this match" set guarantees no question repeats
+  // anywhere in a match — main rounds AND sudden death — instead of relying on a pointer.
+  let usedThisMatch = new Set();
   function draw(){
-    if(drawPtr >= deck.length){ deck = deck.concat(shuffle(BANK)); } // safety refill for long sudden death
-    return deck[drawPtr++];
+    let pool = BANK.filter(q => !usedThisMatch.has(q));
+    if(pool.length === 0){ usedThisMatch = new Set(); pool = BANK.slice(); } // only if a match somehow exceeds the whole bank
+    const q = pool[Math.floor(Math.random()*pool.length)];
+    usedThisMatch.add(q);
+    return q;
   }
+
+  /* ===== current-question / re-entrancy guards (FIX: early-end + double-fire) ===== */
+  let qAnswered = false;    // locks answering once a choice (or timeout) is registered
+  let advancing = false;    // locks the Continue button so a double-tap can't skip a turn
+  let curPlayer = 0, curQ = null, lastRight = false;
+
+  /* ===== timer ===== */
+  let qRAF = null, qStart = 0, qTimeLeft = QUESTION_SECONDS;
+  const timerEl = $('timer'), timerBar = $('timerBar'), timerNum = $('timerNum');
+  function startTimer(){
+    qTimeLeft = QUESTION_SECONDS; qStart = performance.now();
+    renderTimer();
+    AudioFX.startBed(() => qTimeLeft);
+    const step = (now) => {
+      if(qAnswered) return;
+      const elapsed = (now - qStart) / 1000;
+      qTimeLeft = Math.max(0, QUESTION_SECONDS - elapsed);
+      renderTimer();
+      if(qTimeLeft <= 0){ onTimeout(); return; }
+      qRAF = requestAnimationFrame(step);
+    };
+    qRAF = requestAnimationFrame(step);
+  }
+  function renderTimer(){
+    const f = qTimeLeft / QUESTION_SECONDS;
+    timerBar.style.width = (f * 100) + '%';
+    timerNum.textContent = Math.ceil(qTimeLeft);
+    timerEl.classList.toggle('low', qTimeLeft <= 5);
+  }
+  function stopTimer(){ if(qRAF){ cancelAnimationFrame(qRAF); qRAF = null; } AudioFX.stopBed(); }
 
   /* ===== screen switching ===== */
   function show(id){
@@ -360,10 +545,8 @@ WIRE | The recovering-addict informant who helps the detail is named? | A) Bubbl
   }
   function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1800); }
 
-  /* ===== INITIALS — custom on-screen keyboard (no native OS keyboard) ===== */
-  let iniTarget = 0;            // which player is entering
-  let letters = ['A','A','A'];
-  let pos = 0;                  // 0..3 (active slot = min(pos,2))
+  /* ===== INITIALS — custom on-screen QWERTY keyboard (no native OS keyboard) ===== */
+  let iniTarget = 0, letters = ['A','A','A'], pos = 0;
   const slotEls = [$('s0'),$('s1'),$('s2')];
   function activeSlot(){ return Math.min(pos,2); }
   function renderSlots(){ const a=activeSlot(); slotEls.forEach((s,i)=>{ s.textContent=letters[i]; s.classList.toggle('active', i===a); }); }
@@ -371,11 +554,11 @@ WIRE | The recovering-addict informant who helps the detail is named? | A) Bubbl
   function typeBackspace(){ pos=Math.max(pos-1,0); letters[activeSlot()]='A'; renderSlots(); }
   function buildKeyboard(){
     const kb=$('keyboard'); if(!kb || kb.dataset.built) return;
-    const rows=['ABCDEFGHI','JKLMNOPQR','STUVWXYZ','0123456789'];
+    const rows=['QWERTYUIOP','ASDFGHJKL','ZXCVBNM','0123456789'];   // QWERTY layout
     rows.forEach((row,ri)=>{
       const r=document.createElement('div'); r.className='kbd-row';
-      for(const ch of row){ const k=document.createElement('button'); k.type='button'; k.className='key2'; k.textContent=ch; k.addEventListener('click',()=>typeChar(ch)); r.appendChild(k); }
-      if(ri===2){ const del=document.createElement('button'); del.type='button'; del.className='key2 del'; del.innerHTML='&#9003;'; del.setAttribute('aria-label','Backspace'); del.addEventListener('click',typeBackspace); r.appendChild(del); }
+      for(const ch of row){ const k=document.createElement('button'); k.type='button'; k.className='key2'; k.textContent=ch; k.addEventListener('click',()=>{ AudioFX.select(); typeChar(ch); }); r.appendChild(k); }
+      if(ri===2){ const del=document.createElement('button'); del.type='button'; del.className='key2 del'; del.innerHTML='&#9003;'; del.setAttribute('aria-label','Backspace'); del.addEventListener('click',()=>{ AudioFX.select(); typeBackspace(); }); r.appendChild(del); }
       kb.appendChild(r);
     });
     kb.dataset.built='1';
@@ -387,13 +570,13 @@ WIRE | The recovering-addict informant who helps the detail is named? | A) Bubbl
     renderSlots(); show('scrInitials');
   }
   $('btnIniNext').addEventListener('click', ()=>{
+    AudioFX.transition();
     const ini = letters.join('').toUpperCase().replace(/[^A-Z0-9]/g,'').padEnd(3,'A').slice(0,3);
     players[iniTarget].ini = ini;
     if(iniTarget===0){ openInitials(1); }
     else { beginMatch(); }
   });
-  // desktop physical keyboard (no focused field → no OS keyboard)
-  document.addEventListener('keydown', e=>{
+  document.addEventListener('keydown', e=>{   // desktop physical keyboard (no focused field → no OS keyboard)
     if(!$('scrInitials').classList.contains('show')) return;
     const k=e.key;
     if(k==='Enter'){ e.preventDefault(); $('btnIniNext').click(); }
@@ -404,12 +587,12 @@ WIRE | The recovering-addict informant who helps the detail is named? | A) Bubbl
   /* ===== MATCH SETUP ===== */
   function beginMatch(){
     players[0].score=0; players[1].score=0;
-    deck = shuffle(BANK); drawPtr = 0;
+    usedThisMatch = new Set();
     starter = Math.random() < 0.5 ? 0 : 1;   // random initial lead, then alternate each round
     turns = [];
     for(let r=0;r<5;r++){
       const first = (starter + r) % 2;
-      turns.push({ player:first, q:draw() });
+      turns.push({ player:first, q:draw() });   // each draw is unique within the match
       turns.push({ player:1-first, q:draw() });
     }
     tIdx = 0; suddenDeath = false;
@@ -436,12 +619,13 @@ WIRE | The recovering-addict informant who helps the detail is named? | A) Bubbl
     $('passWho').textContent = 'PASS TO ' + players[playerIdx].ini;
     $('passWho').className = 'who '+(playerIdx===0?'p1':'p2');
     $('passFlavor').textContent = pick(PASS_FLAVOR);
-    const btn=$('btnReady');
-    btn.onclick = ()=>{ $('roundTag').textContent = roundLabel; after(); };
+    let done = false;                                   // guard: one advance only
+    $('btnReady').onclick = ()=>{ if(done) return; done = true; AudioFX.transition(); $('roundTag').textContent = roundLabel; after(); };
     show('scrPass');
   }
 
   function askQuestion(playerIdx, q, roundLabel){
+    curPlayer = playerIdx; curQ = q; qAnswered = false; advancing = false; lastRight = false;
     updateHud();
     $('card0').classList.toggle('turn', playerIdx===0);
     $('card1').classList.toggle('turn', playerIdx===1);
@@ -449,29 +633,56 @@ WIRE | The recovering-addict informant who helps the detail is named? | A) Bubbl
     $('qShow').textContent = q.show;
     $('qText').textContent = q.q;
     $('qFlavor').textContent = '';
-    const cont=$('btnContinue'); cont.style.display='none';
+    $('btnContinue').style.display='none';
     const wrap=$('opts'); wrap.innerHTML='';
     q.opts.forEach((label, i)=>{
       const b=document.createElement('button');
       b.type='button'; b.className='opt'; b.textContent=label;   // textContent → no HTML-escaping worries
-      b.addEventListener('click', ()=>answer(playerIdx, q, i, wrap, cont));
+      b.addEventListener('click', ()=>onAnswer(i));
       wrap.appendChild(b);
     });
     show('scrQuestion');
+    startTimer();
   }
 
-  function answer(playerIdx, q, choice, wrap, cont){
-    const btns=[...wrap.querySelectorAll('.opt')];
-    btns.forEach((b,i)=>{ b.disabled=true; if(i===q.correct) b.classList.add('correct'); if(i===choice && choice!==q.correct) b.classList.add('wrong'); });
-    const right = choice===q.correct;
-    if(right){ players[playerIdx].score += BONUS; }
-    updateHud();
-    $('qFlavor').textContent = right ? pick(RIGHT_FLAVOR) : pick(WRONG_FLAVOR);
-    cont.style.display='flex';
-    cont.textContent = (tIdx >= (suddenDeath?1:turns.length)-1 && !nextExists()) ? 'See result' : 'Continue';
-    cont.onclick = ()=>{ if(suddenDeath){ sdAfterAnswer(playerIdx, right); } else { tIdx++; nextTurn(); } };
+  function onAnswer(choice){
+    if(qAnswered) return;            // ANSWER-LOCK: ignore extra taps / ghost clicks
+    AudioFX.select();
+    resolveQuestion(choice, false);
   }
-  function nextExists(){ return suddenDeath ? (sdIdx < sdTurns.length-1) : (tIdx < turns.length-1); }
+  function onTimeout(){
+    if(qAnswered) return;
+    resolveQuestion(-1, true);       // -1 = no answer
+  }
+
+  function resolveQuestion(choice, timedOut){
+    qAnswered = true;
+    stopTimer();
+    const secondsLeft = qTimeLeft;
+    const right = (choice === curQ.correct);
+    lastRight = right;
+    let pts = 0;
+    if(right){ pts = scoreFor(secondsLeft); players[curPlayer].score += pts; }
+    updateHud();
+
+    const wrap=$('opts'); const btns=[...wrap.querySelectorAll('.opt')];
+    btns.forEach((b,i)=>{ b.disabled=true; if(i===curQ.correct) b.classList.add('correct'); if(i===choice && !right) b.classList.add('wrong'); });
+
+    if(timedOut){ AudioFX.timeout(); $('qFlavor').textContent = pick(TIMEOUT_FLAVOR); }
+    else if(right){ AudioFX.correct(); $('qFlavor').textContent = pick(RIGHT_FLAVOR) + '  +' + pts.toLocaleString(); }
+    else { AudioFX.wrong(); $('qFlavor').textContent = pick(WRONG_FLAVOR); }
+
+    const cont=$('btnContinue');
+    cont.style.display='flex';
+    cont.textContent = (!suddenDeath && tIdx >= turns.length-1) ? 'See result' : 'Continue';
+    cont.onclick = ()=>{
+      if(advancing) return;          // ADVANCE-LOCK: a double-tap cannot skip a whole turn
+      advancing = true;
+      AudioFX.transition();
+      if(suddenDeath){ sdAfterAnswer(curPlayer, right); }
+      else { tIdx++; nextTurn(); }
+    };
+  }
 
   /* ===== END / WINNER ===== */
   function endMatch(){
@@ -483,17 +694,18 @@ WIRE | The recovering-addict informant who helps the detail is named? | A) Bubbl
   function startSuddenDeath(){
     suddenDeath = true; sdRound = 0; sdStarter = Math.random()<0.5?0:1;
     $('tieMsg').textContent = 'Dead even at ' + players[0].score.toLocaleString() + '. One question each — first to pull ahead takes it all.';
-    $('btnTie').onclick = ()=> sdStartRound();
+    let done=false;
+    $('btnTie').onclick = ()=>{ if(done) return; done=true; AudioFX.transition(); sdStartRound(); };
     show('scrTie');
   }
   function sdStartRound(){
     const first = (sdStarter + sdRound) % 2;
-    sdTurns = [ {player:first, q:draw()}, {player:1-first, q:draw()} ];
+    sdTurns = [ {player:first, q:draw()}, {player:1-first, q:draw()} ];   // still unique within the match
     sdIdx = 0; sdRoundScore = [0,0];
     sdNextTurn();
   }
   function sdNextTurn(){
-    if(sdIdx >= sdTurns.length){ // both answered this SD round
+    if(sdIdx >= sdTurns.length){
       if(sdRoundScore[0] !== sdRoundScore[1]){ declareWinner(sdRoundScore[0] > sdRoundScore[1] ? 0 : 1); }
       else { sdRound++; toast('Still tied! Sudden death round ' + (sdRound+1)); setTimeout(sdStartRound, 700); }
       return;
@@ -502,14 +714,15 @@ WIRE | The recovering-addict informant who helps the detail is named? | A) Bubbl
     showPass(turn.player, 'SUDDEN DEATH', ()=>askQuestion(turn.player, turn.q, 'SUDDEN DEATH'));
   }
   function sdAfterAnswer(playerIdx, right){
-    if(right) sdRoundScore[playerIdx] += 1;
+    if(right) sdRoundScore[playerIdx] += 1;   // sudden death decided by who gets theirs right
     sdIdx++;
     sdNextTurn();
   }
 
   function declareWinner(winIdx){
     suddenDeath = false;
-    players[winIdx].score += BONUS;   // winner bonus
+    players[winIdx].score += WINNER_BONUS;    // flat winner bonus
+    updateHud();
     const w = players[winIdx];
     $('winIni').textContent = w.ini;
     $('winIni').style.color = winIdx===0 ? 'var(--p1)' : 'var(--p2)';
@@ -518,15 +731,15 @@ WIRE | The recovering-addict informant who helps the detail is named? | A) Bubbl
     $('rewardPick').style.display='block';
     $('rewardMsg').style.display='none';
     $('btnAgain').style.display='none';
-    // wire reward buttons (fresh handlers each time)
     document.querySelectorAll('.reward-btn').forEach(btn=>{
       btn.disabled=false;
       btn.onclick = ()=> awardReward(btn.getAttribute('data-game'), w.ini);
     });
+    AudioFX.win();
     show('scrWin');
   }
 
-  /* ===== REWARD: drop 1,000,000 onto the chosen game's board under winner's initials ===== */
+  /* ===== REWARD: drop a flat 1,000,000 onto the chosen game's board under winner's initials ===== */
   async function awardReward(gameId, ini){
     document.querySelectorAll('.reward-btn').forEach(b=>b.disabled=true);
     const label = {new:'NG', old:'OG', memory:'GYUH'}[gameId] || gameId;
@@ -534,27 +747,29 @@ WIRE | The recovering-addict informant who helps the detail is named? | A) Bubbl
     $('rewardMsg').textContent = 'Dropping the bomb on ' + label + '…';
     const runId = Date.now().toString(36) + Math.random().toString(36).slice(2,10);
     const h = { 'Content-Type':'application/json', 'X-Score-Token': SCORE_TOKEN };
-    // leaderboard.php
     try{
       await fetchT(SCORES_ENDPOINT, { method:'POST', headers:h, body: JSON.stringify({
-        score: BONUS, initials: ini, run_id: runId, mode:'', game: gameId
+        score: REWARD_POINTS, initials: ini, run_id: runId, mode:'', game: gameId
       }) });
     }catch(e){}
-    // hscore.php
     try{
       await fetchT(SCORE_ENDPOINT, { method:'POST', headers:h, body: JSON.stringify({
-        score: BONUS, initials: ini, game: gameId
+        score: REWARD_POINTS, initials: ini, game: gameId
       }) });
     }catch(e){}
-    // confirmation either way (network failure never hangs — both calls are timeout-bounded)
     $('rewardPick').style.display='none';
     $('rewardMsg').textContent = ini + ' just dropped 1,000,000 onto ' + label + '. Check the board.';
     $('btnAgain').style.display='flex';
   }
 
+  /* ===== mute toggle ===== */
+  function renderMute(){ $('muteBtn').innerHTML = AudioFX.isMuted() ? '&#128263;' : '&#128266;'; }
+  $('muteBtn').addEventListener('click', ()=>{ AudioFX.ensure(); AudioFX.setMuted(!AudioFX.isMuted()); renderMute(); });
+  renderMute();
+
   /* ===== wiring ===== */
   buildKeyboard();
-  $('btnStart').addEventListener('click', ()=>{ goImmersive(); openInitials(0); });
+  $('btnStart').addEventListener('click', ()=>{ AudioFX.ensure(); AudioFX.resume(); AudioFX.transition(); goImmersive(); openInitials(0); });
   $('btnAgain').addEventListener('click', ()=>{ openInitials(0); });
 
 })();

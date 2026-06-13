@@ -299,7 +299,18 @@
 
   let score=0, lives=5, wave=1, highAtRun=0;
 
-  const player={ x:0, y:0, speed:0.5, width:fontSize, cooldown:0 };
+  const player={ x:0, y:0, speed:0.5, width:fontSize, cooldown:0, invuln:0 };
+  const INVULN_MS=1200;  // brief post-hit invulnerability so one real hit costs exactly one life
+  // Centralized damage: ignore hits during the invuln window; otherwise lose ONE life.
+  // Returns true if that hit ended the game (caller should bail out of the frame).
+  function damagePlayer(){
+    if(player.invuln>0) return false;          // already hit recently -> no extra life lost
+    lives--; livesEl.textContent=String(lives);
+    player.invuln=INVULN_MS;
+    if(lives<=0){ gameOverScreen(); return true; }
+    sfxHurt();
+    return false;
+  }
   const shots=[], splashes=[], booms=[], bossShots=[];
   let invaders=[], bosses=[];
   let invDir=1, edgeCD=0;
@@ -532,7 +543,7 @@
   /* ===== Flow ===== */
   function resetGame(){
     highAtRun = highScore;
-    score=0; lives=5; wave=1;
+    score=0; lives=5; wave=1; player.invuln=0;
     scoreEl.textContent=fmt.format(0); livesEl.textContent='5'; waveEl.textContent='1';
     shots.length=0; splashes.length=0; booms.length=0; bosses.length=0; bossShots.length=0; invaders.length=0;
     mirrorShots.length=0; mirror=null;
@@ -641,6 +652,7 @@
     }
 
     const dt = now - lastTime; lastTime = now;
+    if(player.invuln>0){ player.invuln-=dt; if(player.invuln<0) player.invuln=0; }
 
     /* Player movement & fire */
     const mv = player.speed * dt * ((keys.right?1:0) - (keys.left?1:0));
@@ -707,7 +719,7 @@
       for(let i=bossShots.length-1;i>=0;i--){
         const bs=bossShots[i]; bs.y += bs.vy * dt;
         if(Math.hypot(bs.x-player.x,bs.y-player.y) < fontSize*0.6){
-          bossShots.splice(i,1); lives--; livesEl.textContent=String(lives); if(lives<=0){gameOverScreen();return;} sfxHurt(); continue;
+          bossShots.splice(i,1); if(damagePlayer()) return; continue;
         }
         if(bs.y > H + fontSize) bossShots.splice(i,1);
       }
@@ -726,7 +738,7 @@
       for(let i=bossShots.length-1;i>=0;i--){
         const bs=bossShots[i]; bs.y+=bs.vy*dt;
         if(Math.hypot(bs.x-player.x,bs.y-player.y)<fontSize*0.6){
-          bossShots.splice(i,1); lives--; livesEl.textContent=String(lives); if(lives<=0){gameOverScreen();return;} sfxHurt(); continue;
+          bossShots.splice(i,1); if(damagePlayer()) return; continue;
         }
         if(bs.type==='drum'){ for(let k=shots.length-1;k>=0;k--){ const sh=shots[k]; if((sh.x-bs.x)**2+(sh.y-bs.y)**2 <= (fontSize*0.9)**2){ shots.splice(k,1); bossShots.splice(i,1); break; } } }
         if(bs.y>H+fontSize) bossShots.splice(i,1);
@@ -775,10 +787,7 @@
         const ms=mirrorShots[i]; ms.y += ms.vy * dt;
         // collide with player
         if(Math.hypot(ms.x - player.x, ms.y - player.y) < fontSize*0.6){
-          mirrorShots.splice(i,1); lives--; livesEl.textContent=String(lives);
-          if(lives<=0){ gameOverScreen(); return; }
-          sfxHurt();
-          continue;
+          mirrorShots.splice(i,1); if(damagePlayer()) return; continue;
         }
         if(ms.y > H + fontSize) mirrorShots.splice(i,1);
       }
@@ -806,7 +815,7 @@
     for(let i=0;i<60;i++){ const x=(i*131%W), y=(i*271%H); ctx.fillRect(x,(y+(now*0.03)%H)|0,2,2); }
     ctx.restore();
 
-    drawEmoji('🐣', player.x, player.y, fontSize*1.05);
+    if(player.invuln<=0 || (Math.floor(player.invuln/90)%2===0)) drawEmoji('🐣', player.x, player.y, fontSize*1.05);
     splashes.forEach(p=>drawEmoji('💦', p.x, p.y, fontSize*0.5));
     shots.forEach(s=>drawEmoji('🌭', s.x, s.y, fontSize*0.9));
     invaders.forEach(inv=>{ if(inv.alive) drawEmoji('😈', inv.x, inv.y, fontSize); });

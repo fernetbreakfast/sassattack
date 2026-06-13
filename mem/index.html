@@ -276,6 +276,7 @@
       <button class="cta" id="startBtn">PRESS START</button>
       <div class="row">
         <button class="cta alt" id="rulesBtn" style="font-size:14px;padding:10px 18px;">How to play</button>
+        <button class="cta alt" id="allBoardsBtn" style="font-size:14px;padding:10px 18px;">&#127942; All Scores</button>
       </div>
       <p class="stats-line muted" style="margin-top:12px;font-size:11px;">No photo? Hit START and we'll deal you one of our sassy house pics.</p>
     </div>
@@ -309,6 +310,16 @@
       <p class="sub">Top 10 GYUH runs across all devices. Sign your run when you die to claim a spot &mdash; your entry glows gold.</p>
       <ol class="scoreList" id="scoresList"><li class="muted">Loading&hellip;</li></ol>
       <button class="cta" id="scoresClose" style="margin-top:16px;">Close</button>
+    </div>
+  </div>
+
+  <!-- ALL SCOREBOARDS (NG / OG / GYUH) -->
+  <div class="overlay" id="allBoards">
+    <div class="card">
+      <h1 style="font-size:32px;">ALL SCORES</h1>
+      <p class="sub">Top 10 across all devices &mdash; NG &middot; OG &middot; GYUH</p>
+      <div id="allBoardsBody"></div>
+      <button class="cta" id="allBoardsClose" style="margin-top:16px;">Close</button>
     </div>
   </div>
 
@@ -1028,6 +1039,36 @@
   startBtn.addEventListener('click', startGame);
   $('rulesBtn').addEventListener('click', () => rulesOv.classList.add('show'));
   $('rulesClose').addEventListener('click', () => rulesOv.classList.remove('show'));
+  /* ===== ALL-SCOREBOARDS VIEWER — live top 10 for NG / OG / GYUH ===== */
+  const allBoardsOv = $('allBoards');
+  const ALL_BOARDS = [['new','NG'], ['old','OG'], ['memory','GYUH']];
+  async function loadAllBoards(){
+    const body = $('allBoardsBody'); body.innerHTML = '';
+    for(const [gid, label] of ALL_BOARDS){
+      const head = document.createElement('div'); head.className = 'lb-head'; head.textContent = label; body.appendChild(head);
+      const ol = document.createElement('ol'); ol.className = 'scoreList'; body.appendChild(ol);
+      const note = (t) => { const li = document.createElement('li'); li.className = 'muted'; li.textContent = t; ol.appendChild(li); };
+      try{
+        const r = await fetchT(SCORES_ENDPOINT + '?game=' + gid, {}, 3500);   // short timeout
+        if(!r.ok) throw new Error('http');
+        const d = await r.json();
+        const top = Array.isArray(d.top) ? d.top.slice(0, 10) : [];
+        if(!top.length){ note('No scores yet.'); continue; }
+        top.forEach((row, i) => {
+          const li = document.createElement('li');
+          const ini = (row.initials || '---').toUpperCase().slice(0, 3);
+          const mE = MODE_EMOJI[row.mode] || '';
+          const a = document.createElement('span');
+          a.innerHTML = '<span class="rank">' + (i+1) + '.</span> <span class="modeBadge">' + mE + '</span>' + ini;
+          const b = document.createElement('b'); b.textContent = fmtFull(row.score || 0);
+          li.append(a, b); ol.appendChild(li);
+        });
+      }catch(e){ note("Couldn't load."); }   // per-section failure never blocks the others
+    }
+  }
+  $('allBoardsBtn').addEventListener('click', () => { allBoardsOv.classList.add('show'); loadAllBoards(); });
+  $('allBoardsClose').addEventListener('click', () => { allBoardsOv.classList.remove('show'); });
+
   $('scoresBtn').addEventListener('click', () => { scoresOv.classList.add('show'); renderTop($('scoresList')); });
   $('scoresClose').addEventListener('click', () => scoresOv.classList.remove('show'));
   $('restart').addEventListener('click', () => { goOv.classList.remove('show'); startOv.classList.add('show'); });

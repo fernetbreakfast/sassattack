@@ -126,6 +126,17 @@
   .winner-ini{ font-size:clamp(40px,16vw,84px); font-weight:900; letter-spacing:4px; }
   .pickgrid{ display:flex; flex-direction:column; gap:12px; width:100%; }
   .foot{ color:#8b93c0; font-size:12px; letter-spacing:.5px; }
+  /* all-scoreboards viewer */
+  .board-sec{ width:100%; border:1px solid rgba(0,224,255,.3); border-radius:14px; padding:10px 12px;
+    background:rgba(10,14,34,.5); text-align:left; }
+  .board-sec h3{ margin:0 0 6px; font-size:14px; letter-spacing:1px; color:var(--neon); }
+  .board-list{ list-style:none; margin:0; padding:0; }
+  .board-list li{ display:flex; justify-content:space-between; gap:12px; padding:4px 2px; font-weight:700;
+    font-size:15px; border-bottom:1px dashed rgba(255,255,255,.12); font-variant-numeric:tabular-nums; }
+  .board-list li:last-child{ border-bottom:none; }
+  .board-list .bi{ color:#fff; } .board-list .bi .br{ color:var(--neon); font-weight:900; }
+  .board-list .bs{ color:var(--gold); }
+  .board-note{ color:#8b93c0; font-size:13px; }
 
   /* mute toggle */
   .mute{ position:fixed; top:max(10px,env(safe-area-inset-top)); right:12px; z-index:90;
@@ -133,11 +144,6 @@
     display:grid; place-items:center; font-size:20px; cursor:pointer;
     border:1px solid rgba(0,224,255,.4); background:rgba(10,14,34,.7); color:#fff; }
   .mute:active{ transform:scale(.92); }
-
-  /* very rare surprise photo — brief full-screen flash on a transition screen */
-  .surprise{ position:fixed; inset:0; z-index:120; display:none; background:#000; }
-  .surprise.show{ display:block; }
-  .surprise img{ width:100%; height:100%; object-fit:cover; display:block; }
 
   .toast{
     position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px);
@@ -150,8 +156,6 @@
 <body>
 
   <button class="mute" id="muteBtn" aria-label="Toggle sound">&#128266;</button>
-  <!-- very rare surprise photo overlay -->
-  <div class="surprise" id="surprise" aria-hidden="true"><img src="img/surprise.jpg" alt="" /></div>
 
   <!-- TITLE -->
   <section class="screen show" id="scrTitle">
@@ -159,7 +163,18 @@
       <h1 class="title">WUH?</h1>
       <p class="sub">Two players. One phone. Five rounds of TV trivia.<br>Answer fast for more points. Loser passes the phone.</p>
       <button class="cta" id="btnStart">Start</button>
+      <button class="cta alt" id="btnBoards">&#127942; Leaderboards</button>
       <p class="foot">&#129370; sassybreakfa.st &middot; hot-seat trivia</p>
+    </div>
+  </section>
+
+  <!-- ALL SCOREBOARDS -->
+  <section class="screen" id="scrBoards">
+    <div class="wrap" style="gap:14px;">
+      <h1 class="title" style="font-size:clamp(28px,9vw,46px);">SCORES</h1>
+      <p class="sub">Top 10 across all devices &mdash; NG &middot; OG &middot; GYUH</p>
+      <div id="boardsBody" style="width:100%; display:flex; flex-direction:column; gap:14px;"></div>
+      <button class="cta alt" id="boardsBack">Back</button>
     </div>
   </section>
 
@@ -254,21 +269,6 @@
     return Math.max(MIN_Q_POINTS, Math.round(MAX_Q_POINTS * secondsLeft / QUESTION_SECONDS));
   }
 
-  // VERY RARE surprise photo: rolled only on pass/round-transition screens (never during the
-  // answer timer), so it can't affect scoring, the countdown, or the turn flow. Tweak freely.
-  const RARE_PHOTO_CHANCE = 0.008;   // ~0.8% per pass screen (rarer)
-  const SURPRISE_PHOTOS = ['img/surprise.jpg','img/surprise2.jpg','img/surprise3.jpg','img/surprise4.jpg'];
-  function maybeSurprisePhoto(){
-    if(Math.random() >= RARE_PHOTO_CHANCE) return;
-    const ov = document.getElementById('surprise'); if(!ov) return;
-    const img = ov.querySelector('img');
-    if(img) img.src = SURPRISE_PHOTOS[Math.floor(Math.random() * SURPRISE_PHOTOS.length)];  // random photo from the pool
-    ov.classList.add('show');                 // overlay swallows taps while visible
-    try{ AudioFX.surprise(); }catch(e){}       // tiny soft stinger (respects mute)
-    clearTimeout(ov._t);
-    ov._t = setTimeout(() => ov.classList.remove('show'), 1700);  // ~1.7s, then game continues
-  }
-
   function fetchT(url, opts = {}, ms = 3500){
     const c = new AbortController();
     const t = setTimeout(() => c.abort(), ms);
@@ -329,7 +329,6 @@
 
     // --- SFX ---
     const select     = () => tone(620, 0.06, 'square', 0.10);
-    const surprise   = () => { tone(880, 0.12, 'triangle', 0.11); tone(1318.5, 0.18, 'sine', 0.09, null, 0.09); }; // soft two-note chime
     const correct    = () => arp([523.25, 659.25, 783.99, 1046.5], 0.07, 0.18, 'sine', 0.16);     // C E G C ↑
     const wrong      = () => { tone(190, 0.30, 'sawtooth', 0.22, 90); tone(140, 0.32, 'square', 0.14, 70, 0.02); }; // buzzer
     const timeout    = () => arp([440, 330, 247, 165], 0.10, 0.22, 'triangle', 0.18);             // descending
@@ -445,7 +444,7 @@
     }
 
     return { ensure, resume, isMuted: () => muted, setMuted,
-             select, correct, wrong, timeout, transition, win, surprise,
+             select, correct, wrong, timeout, transition, win,
              startBed, stopBed };
   })();
 
@@ -829,7 +828,6 @@ ATL | Atlanta is the capital of which U.S. state? | A) Georgia | B) Alabama | C)
     let done = false;                                   // guard: one advance only
     $('btnReady').onclick = ()=>{ if(done) return; done = true; AudioFX.transition(); $('roundTag').textContent = roundLabel; after(); };
     show('scrPass');
-    maybeSurprisePhoto();   // very rarely flashes a surprise image over this transition
 
   }
 
@@ -980,6 +978,38 @@ ATL | Atlanta is the capital of which U.S. state? | A) Georgia | B) Alabama | C)
 
   /* ===== wiring ===== */
   buildKeyboard();
+  /* ===== ALL-SCOREBOARDS VIEWER — live top 10 for NG / OG / GYUH ===== */
+  const BOARD_GAMES = [['new','NG'], ['old','OG'], ['memory','GYUH']];
+  async function loadBoards(){
+    const body = $('boardsBody'); body.innerHTML = '';
+    for(const [gid, label] of BOARD_GAMES){
+      const sec = document.createElement('div'); sec.className = 'board-sec';
+      const h = document.createElement('h3'); h.textContent = label; sec.appendChild(h);
+      const list = document.createElement('ol'); list.className = 'board-list'; sec.appendChild(list);
+      body.appendChild(sec);
+      const note = (txt) => { const li = document.createElement('li'); li.className = 'board-note'; li.textContent = txt; list.appendChild(li); };
+      try{
+        const r = await fetchT(SCORES_ENDPOINT + '?game=' + gid, {}, 3500);   // short timeout
+        if(!r.ok) throw new Error('http');
+        const d = await r.json();
+        const top = Array.isArray(d.top) ? d.top.slice(0, 10) : [];
+        if(!top.length){ note('No scores yet.'); continue; }
+        top.forEach((row, i) => {
+          const li = document.createElement('li');
+          const ini = (row.initials || '---').toUpperCase().slice(0, 3);
+          const a = document.createElement('span'); a.className = 'bi';
+          a.innerHTML = '<span class="br">' + (i+1) + '.</span> ' + ini;
+          const b = document.createElement('span'); b.className = 'bs';
+          b.textContent = Number(row.score || 0).toLocaleString();
+          li.append(a, b); list.appendChild(li);
+        });
+      }catch(e){ note("Couldn't load."); }   // per-section failure never hangs the others
+    }
+  }
+  function showBoards(){ show('scrBoards'); loadBoards(); }
+  $('btnBoards').addEventListener('click', ()=>{ AudioFX.ensure(); AudioFX.resume(); AudioFX.transition(); showBoards(); });
+  $('boardsBack').addEventListener('click', ()=>{ AudioFX.transition(); show('scrTitle'); });
+
   $('btnStart').addEventListener('click', ()=>{ AudioFX.ensure(); AudioFX.resume(); AudioFX.transition(); goImmersive(); openInitials(0); });
   // FIX: robust resume-on-gesture safety net — unlock/resume the AudioContext on ANY user
   // gesture (some mobile browsers suspend it between taps/screens), so background music plays.

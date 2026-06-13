@@ -74,5 +74,42 @@
     </nav>
     <p class="foot">&#129370; sassybreakfa.st</p>
   </main>
+  <script>
+  (() => {
+    'use strict';
+    // Play /sample.mp3 (the echoed chase clip) on game selection, then navigate once it ends.
+    // Page navigation stops audio, so hold the link until the audio 'ended' event (or a
+    // fallback timeout) before following it. Audio is unlocked inside the tap gesture so
+    // mobile browsers allow playback; if it can't play, navigate immediately.
+    const SAMPLE = '/sample.mp3';
+    const FALLBACK_MS = 2500;
+    let audio = null;
+    try { audio = new Audio(SAMPLE); audio.preload = 'auto'; } catch (e) { audio = null; }
+
+    document.querySelectorAll('a.game-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const href = btn.getAttribute('href');
+        if (!href) return;
+        e.preventDefault();
+        let navigated = false;
+        const go = () => { if (navigated) return; navigated = true; window.location.href = href; };
+
+        const timer = setTimeout(go, FALLBACK_MS);   // always proceed even if 'ended' never fires
+
+        if (!audio) { clearTimeout(timer); go(); return; }
+        try {
+          audio.currentTime = 0;
+          audio.onended = () => { clearTimeout(timer); go(); };
+          const pr = audio.play();
+          if (pr && typeof pr.catch === 'function') {
+            pr.catch(() => { clearTimeout(timer); go(); }); // blocked/failed -> navigate now
+          }
+        } catch (err) {
+          clearTimeout(timer); go();
+        }
+      });
+    });
+  })();
+  </script>
 </body>
 </html>

@@ -134,6 +134,11 @@
     border:1px solid rgba(0,224,255,.4); background:rgba(10,14,34,.7); color:#fff; }
   .mute:active{ transform:scale(.92); }
 
+  /* very rare surprise photo — brief full-screen flash on a transition screen */
+  .surprise{ position:fixed; inset:0; z-index:120; display:none; background:#000; }
+  .surprise.show{ display:block; }
+  .surprise img{ width:100%; height:100%; object-fit:cover; display:block; }
+
   .toast{
     position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px);
     background:rgba(10,14,34,.92); border:1px solid rgba(255,59,107,.5); color:#fff;
@@ -145,6 +150,8 @@
 <body>
 
   <button class="mute" id="muteBtn" aria-label="Toggle sound">&#128266;</button>
+  <!-- very rare surprise photo overlay -->
+  <div class="surprise" id="surprise" aria-hidden="true"><img src="img/surprise.jpg" alt="" /></div>
 
   <!-- TITLE -->
   <section class="screen show" id="scrTitle">
@@ -247,6 +254,18 @@
     return Math.max(MIN_Q_POINTS, Math.round(MAX_Q_POINTS * secondsLeft / QUESTION_SECONDS));
   }
 
+  // VERY RARE surprise photo: rolled only on pass/round-transition screens (never during the
+  // answer timer), so it can't affect scoring, the countdown, or the turn flow. Tweak freely.
+  const RARE_PHOTO_CHANCE = 0.015;   // ~1.5% per pass screen
+  function maybeSurprisePhoto(){
+    if(Math.random() >= RARE_PHOTO_CHANCE) return;
+    const ov = document.getElementById('surprise'); if(!ov) return;
+    ov.classList.add('show');                 // overlay swallows taps while visible
+    try{ AudioFX.surprise(); }catch(e){}       // tiny soft stinger (respects mute)
+    clearTimeout(ov._t);
+    ov._t = setTimeout(() => ov.classList.remove('show'), 1700);  // ~1.7s, then game continues
+  }
+
   function fetchT(url, opts = {}, ms = 3500){
     const c = new AbortController();
     const t = setTimeout(() => c.abort(), ms);
@@ -307,6 +326,7 @@
 
     // --- SFX ---
     const select     = () => tone(620, 0.06, 'square', 0.10);
+    const surprise   = () => { tone(880, 0.12, 'triangle', 0.11); tone(1318.5, 0.18, 'sine', 0.09, null, 0.09); }; // soft two-note chime
     const correct    = () => arp([523.25, 659.25, 783.99, 1046.5], 0.07, 0.18, 'sine', 0.16);     // C E G C ↑
     const wrong      = () => { tone(190, 0.30, 'sawtooth', 0.22, 90); tone(140, 0.32, 'square', 0.14, 70, 0.02); }; // buzzer
     const timeout    = () => arp([440, 330, 247, 165], 0.10, 0.22, 'triangle', 0.18);             // descending
@@ -397,7 +417,7 @@
     }
 
     return { ensure, resume, isMuted: () => muted, setMuted,
-             select, correct, wrong, timeout, transition, win,
+             select, correct, wrong, timeout, transition, win, surprise,
              startBed, stopBed };
   })();
 
@@ -566,8 +586,21 @@ SOH | Barry is based in which California city? | A) San Jose | B) Los Angeles | 
     'Eyes on the prize, brain in gear.', 'Don\'t embarrass yourself. Or do, it\'s funnier.'
   ];
   const RIGHT_FLAVOR = [
-    'Correct! Speed pays.', 'Big brain energy.', 'You absolute trivia gremlin. Nailed it.',
-    'Money. Straight cash.', 'Fast AND right. Show-off.'
+    "Correct. Don't let it go to your head.",
+    "Right — even a broken clock, huh?",
+    "Ugh, fine. That's correct.",
+    "Look at you, knowing things.",
+    "Correct. I'm as shocked as you are.",
+    "Yeah yeah, you got it. Settle down.",
+    "Right answer. Beginner's luck, surely.",
+    "Correct. Cute. Anyway—",
+    "Wow, somebody studied. Nerd.",
+    "Fine. Point awarded. Don't gloat.",
+    "Correct, you magnificent show-off.",
+    "Okay okay, you're smart. We get it.",
+    "Right. Try to act like you've been here before.",
+    "Correct. Statistically, it had to happen.",
+    "Ding ding. Don't make it weird."
   ];
   const WRONG_FLAVOR = [
     'Nope. Zero dollars. Zero cents.', 'Wrong. The sass is disappointed.',
@@ -756,6 +789,8 @@ SOH | Barry is based in which California city? | A) San Jose | B) Los Angeles | 
     let done = false;                                   // guard: one advance only
     $('btnReady').onclick = ()=>{ if(done) return; done = true; AudioFX.transition(); $('roundTag').textContent = roundLabel; after(); };
     show('scrPass');
+    maybeSurprisePhoto();   // very rarely flashes a surprise image over this transition
+
   }
 
   function askQuestion(playerIdx, q, roundLabel){

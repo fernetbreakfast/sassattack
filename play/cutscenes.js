@@ -244,7 +244,7 @@ const SCENES=[
     E('😈', 0.88, 0.18, 0.9, 0.8); // watching from the corner, confused
     if(k>0.3) bubble(0.88,0.10,'?',Math.min(1,(k-0.3)*4));
   }
-  if(t>5200) caption('…', seg(t,5200,5600));
+  if(t>5200) caption("can't stop her", seg(t,5200,5600));
 }},
 {id:'audience',music:'arcade',e:'👹',title:'The Audience',note:'boss wave · 7s · the first tell',dur:7000,draw(t){
   stars(t);

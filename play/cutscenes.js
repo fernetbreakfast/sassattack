@@ -231,7 +231,7 @@ function stopMusic(){
 /* each: {id,e,title,note,dur,draw(t)} — t in ms from scene start */
 const SCENES=[
 {grp:'ROTATION — between early waves'},
-{id:'chase',music:'arcade',e:'🌭',title:'The Chase',note:'after wave 1 · 6s',dur:6000,draw(t){
+{id:'chase',music:'arcade',e:'🌭',title:'The Chase',note:'after wave 1 · 7s',dur:7000,draw(t){
   stars(t);
   if(t<2700){ // L -> R
     const k=seg(t,0,2700);

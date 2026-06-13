@@ -3,7 +3,10 @@
 <head>
 <!-- published via Dispatch 2026-06-12T23:47Z -->
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <title>Sass Attack — Deluxe</title>
 <link rel="icon" type="image/png" href="/gfx/eggman_final.png" />
 <style>
@@ -15,6 +18,8 @@
   *{box-sizing:border-box;}
   html,body{
     margin:0; height:100%;
+    height:100svh; height:100dvh;
+    overscroll-behavior:none;
     background:
       radial-gradient(1400px 900px at 50% 18%, #141a3a 0%, var(--bg1) 42%, var(--bg0) 100%);
     color:#fff;
@@ -856,8 +861,19 @@
     player.spread=player.rapid=player.shield=player.power=0; player.x=W/2;
     newWave(1); lastTime=performance.now();
   }
+  // Best-effort immersive/fullscreen on the start gesture. Real Fullscreen API
+  // works on Android Chrome; iOS Safari ignores it (Apple limitation) and falls
+  // back to the viewport-fit + web-app meta tags. All wrapped so it never throws.
+  function goImmersive(){
+    try{ const el=document.documentElement;
+      const rfs=el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen;
+      if(rfs){ const pr=rfs.call(el); if(pr&&pr.catch) pr.catch(()=>{}); }
+    }catch(e){}
+    try{ if(screen.orientation&&screen.orientation.lock){ const po=screen.orientation.lock('portrait'); if(po&&po.catch) po.catch(()=>{}); } }catch(e){}
+  }
   function startGame(){
     if(started)return; started=true; ac();
+    goImmersive();
     if(window.SassCutscenes){ SassCutscenes.setVoice(voiceOn); SassCutscenes.unlockVoice(); }
     rulesOv.classList.remove('show'); scoresOv.classList.remove('show'); startOv.classList.remove('show');
     resetGame(); running=true; requestAnimationFrame(loop);

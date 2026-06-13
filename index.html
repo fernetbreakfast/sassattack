@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <title>Sass Attack</title>
 <link rel="icon" type="image/png" href="/gfx/eggman_final.png" />
 <style>
@@ -12,9 +15,9 @@
     --bg0:#05060f; --bg1:#0a0e22;
   }
   *{ box-sizing:border-box; }
-  html,body{ margin:0; height:100%; }
+  html,body{ margin:0; height:100%; overscroll-behavior:none; }
   body{
-    min-height:100%;
+    min-height:100vh; min-height:100svh; min-height:100dvh;
     background:
       radial-gradient(1400px 900px at 50% 18%, #141a3a 0%, var(--bg1) 42%, var(--bg0) 100%);
     color:#fff;

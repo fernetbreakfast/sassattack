@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <title>Sass Attack</title>
 
 <link rel="icon" type="image/png" href="gfx/eggman_final.png" />
@@ -11,6 +14,8 @@
   :root { color-scheme: dark; }
   html, body {
     margin: 0; height: 100%;
+    height: 100svh; height: 100dvh;
+    overscroll-behavior: none;
     background: #000; color: #fff;
     font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
     -webkit-user-select: none; user-select: none;
@@ -517,8 +522,19 @@
     mirrorShots.length=0; mirror=null;
     newWave(1); lastTime=performance.now();
   }
+  // Best-effort immersive/fullscreen on the start gesture. Real Fullscreen API
+  // works on Android Chrome; iOS Safari ignores it (Apple limitation) and falls
+  // back to the viewport-fit + web-app meta tags. All wrapped so it never throws.
+  function goImmersive(){
+    try{ const el=document.documentElement;
+      const rfs=el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen;
+      if(rfs){ const pr=rfs.call(el); if(pr&&pr.catch) pr.catch(()=>{}); }
+    }catch(e){}
+    try{ if(screen.orientation&&screen.orientation.lock){ const po=screen.orientation.lock('portrait'); if(po&&po.catch) po.catch(()=>{}); } }catch(e){}
+  }
   function startGame(){
     if(started) return; started=true;
+    goImmersive();
     if(rulesOv.classList.contains('show')){ rulesOv.classList.remove('show'); rulesOv.setAttribute('aria-hidden','true'); }
     if(scoresOv.classList.contains('show')){ scoresOv.classList.remove('show'); scoresOv.setAttribute('aria-hidden','true'); }
     startOv.classList.remove('show');

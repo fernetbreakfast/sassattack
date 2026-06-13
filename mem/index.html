@@ -2,7 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="robots" content="noindex, noimageindex" />
 <title>GYUH? — Sass Attack</title>
 <link rel="icon" type="image/png" href="/gfx/eggman_final.png" />
@@ -15,6 +18,7 @@
   *{ box-sizing:border-box; }
   html,body{
     margin:0; height:100%;
+    overscroll-behavior:none;
     background:
       radial-gradient(1400px 900px at 50% 18%, #141a3a 0%, var(--bg1) 42%, var(--bg0) 100%);
     color:#fff;
@@ -22,7 +26,7 @@
     -webkit-user-select:none; user-select:none;
     -webkit-touch-callout:none;
   }
-  body{ min-height:100%; display:flex; flex-direction:column; }
+  body{ min-height:100%; height:100svh; height:100dvh; overflow:hidden; display:flex; flex-direction:column; }
 
   /* HUD */
   .hud{
@@ -53,7 +57,8 @@
 
   /* Stage */
   .stage{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
-    width:100%; padding:16px 14px max(20px,env(safe-area-inset-bottom)); gap:14px; }
+    width:100%; padding:16px 14px max(20px,env(safe-area-inset-bottom)); gap:14px;
+    overflow-y:auto; }
   .caption{ min-height:22px; font-size:clamp(14px,4.2vw,17px); font-weight:900; letter-spacing:.4px;
     text-align:center; color:#c6cdf2; max-width:min(94vw,520px); }
   .caption.hot{ color:var(--hot); animation:pop .3s ease; }
@@ -708,8 +713,19 @@
     bestEl.textContent = fmtShort(best);
   }
 
+  // Best-effort immersive/fullscreen on a user gesture. Real Fullscreen API
+  // works on Android Chrome; iOS Safari ignores it (Apple limitation) and falls
+  // back to the viewport-fit + web-app meta tags. All wrapped so it never throws.
+  function goImmersive(){
+    try{ const el=document.documentElement;
+      const rfs=el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen;
+      if(rfs){ const pr=rfs.call(el); if(pr&&pr.catch) pr.catch(()=>{}); }
+    }catch(e){}
+    try{ if(screen.orientation&&screen.orientation.lock){ const po=screen.orientation.lock('portrait'); if(po&&po.catch) po.catch(()=>{}); } }catch(e){}
+  }
   function startGame(){
     ac(); // unlock audio on user gesture
+    goImmersive();
     runId = Date.now().toString(36) + Math.random().toString(36).slice(2,10);
     // User photo wins; otherwise rotate one of the bundled defaults.
     gameImg = imgReady ? imgEl : pickDefault();
@@ -973,7 +989,7 @@
       const dots = dotsWrap.querySelectorAll('.pinDot');
       dots.forEach((d,i) => d.classList.toggle('on', i < entry.length));
     }
-    function unlock(){ gate.classList.remove('show'); }  // no persistence: gate returns next load
+    function unlock(){ gate.classList.remove('show'); goImmersive(); }  // no persistence: gate returns next load
     function reject(){
       errEl.textContent = 'Nope. Try again.';
       card.classList.add('shake');

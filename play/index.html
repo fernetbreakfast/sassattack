@@ -422,9 +422,9 @@
 
   /* ===== DIFFICULTY ===== */
   const MODES={
-    sunny:{e:'🍳',name:'SUNNY SIDE', lives:6, spd:0.85,fire:0.85,drop:0.15, bdrop:0.9, mWave:8, mCount:1, mul:1,   scorch:0.20, bossWave:3, unlockShift:0},
-    spicy:{e:'🌶️',name:'SPICY',      lives:5, spd:1.0, fire:1.0, drop:0.12, bdrop:0.9, mWave:8, mCount:1, mul:1.5, scorch:0.20, bossWave:2, unlockShift:0},
-    death:{e:'💀',name:'SASS DEATH', lives:3, spd:1.70,fire:1.85, drop:0.06, bdrop:0.8, mWave:7, mCount:2, mul:3,   scorch:0.25, bossWave:1, unlockShift:1}
+    sunny:{e:'🍳',name:'SUNNY SIDE', lives:6, spd:0.85,fire:0.85,drop:0.15, bdrop:0.9, mWave:8, mCount:1, mul:1,   scorch:0.20, bossWave:3, unlockShift:0, maxBomb:5},
+    spicy:{e:'🌶️',name:'SPICY',      lives:5, spd:0.94,fire:1.0, drop:0.12, bdrop:0.9, mWave:8, mCount:1, mul:1.5, scorch:0.20, bossWave:2, unlockShift:0, maxBomb:4},
+    death:{e:'💀',name:'SASS DEATH', lives:3, spd:1.02,fire:1.85, drop:0.06, bdrop:0.8, mWave:7, mCount:2, mul:3,   scorch:0.25, bossWave:1, unlockShift:1, maxBomb:2}
   };
   let modeKey=store.get('sass_mode')||'sunny';
   if(!MODES[modeKey])modeKey='sunny';
@@ -466,7 +466,7 @@
   /* ===== STATE ===== */
   let running=false, started=false, lastTime=performance.now();
   let W=0,H=0,fontSize=64, slowmo=1, shakeT=0, shakeMag=0, flashT=0;
-  let score=0, lives=5, wave=1, highAtRun=0, bombs=3;
+  let score=0, lives=5, wave=1, highAtRun=0, bombs=Math.min(3,MODE.maxBomb);
   let runId='';
   let scorchUsed=false;
   let combo=0, comboTimer=0;
@@ -520,7 +520,7 @@
     bacon:{e:'🥓',label:'SHIELD UP', apply:()=>player.shield=Math.max(player.shield,9000)},
     fire:{e:'🔥',label:'DAMAGE UP', apply:()=>player.power=10000},
     butter:{e:'🧈',label:'SLOW-MO', apply:()=>slowmo=0.45},
-    bomb:{e:'💣',label:'+1 BOMB', apply:()=>{bombs++;syncSpecials();}},
+    bomb:{e:'💣',label:'+1 BOMB', apply:()=>{bombs=Math.min(bombs+1,MODE.maxBomb);syncSpecials();}},
     disco:{e:'🪩',label:'DISCO CLEAR', apply:()=>discoClear()},
     heart:{e:'❤️',label:'+1 LIFE', apply:()=>{lives++;livesEl.textContent=String(lives);}}
   };
@@ -754,7 +754,10 @@
     if(bombs<=0||!running)return;
     bombs--; syncSpecials(); sfxBomb(); shake(18,400); flash();
     let pay=0;
-    invaders.forEach(inv=>{ if(inv.alive){ inv.alive=false; pay+=GRUNTS[inv.type].pay; countKill(); burst(inv.x,inv.y,'rgba(255,59,107,1)',8,0.5); } });
+    const aliveInv=invaders.filter(inv=>inv.alive);
+    const nKill=aliveInv.length?Math.max(1,Math.round(aliveInv.length*0.30)):0;
+    for(let i=aliveInv.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); const t=aliveInv[i]; aliveInv[i]=aliveInv[j]; aliveInv[j]=t; }
+    aliveInv.slice(0,nKill).forEach(inv=>{ inv.alive=false; pay+=GRUNTS[inv.type].pay; countKill(); burst(inv.x,inv.y,'rgba(255,59,107,1)',8,0.5); });
     bosses.forEach(b=>{ b.hp-=5; burst(b.x,b.y,'rgba(255,210,63,1)',16,0.7); });
     bossShots.length=0; mirrorShots.length=0;
     award(pay);
@@ -836,7 +839,7 @@
 
   /* ===== FLOW ===== */
   function resetGame(){
-    highAtRun=highScore; score=0; lives=MODE.lives; wave=1; bombs=3; slowmo=1; resetCombo();
+    highAtRun=highScore; score=0; lives=MODE.lives; wave=1; bombs=Math.min(3,MODE.maxBomb); slowmo=1; resetCombo();
     scorchUsed=false; syncSpecials();
     buildCsQueue(); if(cut.active){ cut.active=false; if(window.SassCutscenes)SassCutscenes.stop(); }
     discoFx=null;

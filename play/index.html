@@ -238,8 +238,8 @@
       <h1>SASS ATTACK</h1>
       <p class="sub" style="margin-bottom:10px;">🐣 vs the breakfast underworld.<br>Pick your pain level.</p>
       <div class="modes">
-        <button class="mode" data-mode="sunny"><div class="me1">🍳</div><div class="me2">SUNNY SIDE</div><div class="me3">6 ♥ · gentle · x1</div></button>
-        <button class="mode" data-mode="spicy"><div class="me1">🌶️</div><div class="me2">SPICY</div><div class="me3">5 ♥ · classic · x1.5</div></button>
+        <button class="mode" data-mode="sunny"><div class="me1">🍳</div><div class="me2">SUNNY SIDE</div><div class="me3">3 ♥ · gentle · x1</div></button>
+        <button class="mode" data-mode="spicy"><div class="me1">🌶️</div><div class="me2">SPICY</div><div class="me3">3 ♥ · classic · x1.5</div></button>
         <button class="mode" data-mode="death"><div class="me1">💀</div><div class="me2">SASS DEATH</div><div class="me3">3 ♥ · brutal · x3</div></button>
       </div>
       <button class="cta" id="startBtn">PRESS START</button>
@@ -268,8 +268,8 @@
 
       <div class="rule-sec">
         <h3>🍳🌶️💀 DIFFICULTY</h3>
-        <p><b>🍳 Sunny Side</b> — 6 ♥, slow and gentle, generous drops, bosses arrive late. A warm welcome. Scores count x1.</p>
-        <p><b>🌶️ Spicy</b> — 5 ♥, the classic pace. Scores count <span class="tag">x1.5</span>.</p>
+        <p><b>🍳 Sunny Side</b> — 3 ♥, slow and gentle, generous drops, bosses arrive late. A warm welcome. Scores count x1.</p>
+        <p><b>🌶️ Spicy</b> — 3 ♥, the classic pace. Scores count <span class="tag">x1.5</span>.</p>
         <p><b>💀 Sass Death</b> — 3 ♥, fast and mean, bosses from wave 1, a <b>double</b> Mirror Match at wave 7, scorched earth costs 25%. Brutal but beatable. Scores count <span class="tag">x3</span>.</p>
       </div>
 
@@ -422,8 +422,8 @@
 
   /* ===== DIFFICULTY ===== */
   const MODES={
-    sunny:{e:'🍳',name:'SUNNY SIDE', lives:6, spd:0.85,fire:0.85,drop:0.15, bdrop:0.9, mWave:8, mCount:1, mul:1,   scorch:0.20, bossWave:3, unlockShift:0, maxBomb:5},
-    spicy:{e:'🌶️',name:'SPICY',      lives:5, spd:0.94,fire:1.0, drop:0.12, bdrop:0.9, mWave:8, mCount:1, mul:1.5, scorch:0.20, bossWave:2, unlockShift:0, maxBomb:4},
+    sunny:{e:'🍳',name:'SUNNY SIDE', lives:3, spd:0.85,fire:0.85,drop:0.15, bdrop:0.9, mWave:8, mCount:1, mul:1,   scorch:0.20, bossWave:3, unlockShift:0, maxBomb:5},
+    spicy:{e:'🌶️',name:'SPICY',      lives:3, spd:0.94,fire:1.0, drop:0.12, bdrop:0.9, mWave:8, mCount:1, mul:1.5, scorch:0.20, bossWave:2, unlockShift:0, maxBomb:4},
     death:{e:'💀',name:'SASS DEATH', lives:3, spd:1.02,fire:1.85, drop:0.06, bdrop:0.8, mWave:7, mCount:2, mul:3,   scorch:0.25, bossWave:1, unlockShift:1, maxBomb:2}
   };
   let modeKey=store.get('sass_mode')||'sunny';
@@ -522,11 +522,11 @@
     butter:{e:'🧈',label:'SLOW-MO', apply:()=>slowmo=0.45},
     bomb:{e:'💣',label:'+1 BOMB', apply:()=>{bombs=Math.min(bombs+1,MODE.maxBomb);syncSpecials();}},
     disco:{e:'🪩',label:'DISCO CLEAR', apply:()=>discoClear()},
-    heart:{e:'❤️',label:'+1 LIFE', apply:()=>{lives++;livesEl.textContent=String(lives);}}
+    heart:{e:'❤️',label:'+1 LIFE', apply:()=>{lives=Math.min(lives+1,5);livesEl.textContent=String(lives);}}
   };
   const POWER_KEYS=Object.keys(POWERS);
   function pickPowerKey(boss,kind){
-    if(kind==='king'&&Math.random()<0.18) return 'heart';   // only the Demon King carries hearts
+    if(kind==='king'&&Math.random()<0.36) return 'heart';   // only the Demon King carries hearts
     if(Math.random()<0.05) return 'disco';                  // rare, for everyone
     if(boss){
       if(Math.random()<0.05) return 'bomb';                 // bosses rarely give bombs

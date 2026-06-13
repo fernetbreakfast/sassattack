@@ -68,9 +68,8 @@
   /* Controls */
   .controls{ position:fixed; left:0; right:0;
     bottom:calc(10px + env(safe-area-inset-bottom));
-    display:flex; justify-content:space-between; align-items:flex-end;
+    display:flex; justify-content:center; align-items:flex-end;
     gap:12px; padding:0 12px; box-sizing:border-box; z-index:4; pointer-events:none; }
-  .cluster{ display:flex; align-items:flex-end; gap:12px; pointer-events:none; }
   .btn{
     pointer-events:auto; -webkit-tap-highlight-color:transparent;
     width:min(20vw,108px); height:min(10vh,78px);
@@ -223,15 +222,11 @@
   <div class="wrap"><canvas id="game"></canvas></div>
 
   <div class="controls">
-    <div class="cluster move">
-      <button class="btn" id="left">◀</button>
-      <button class="btn" id="right">▶</button>
-    </div>
-    <div class="cluster act">
-      <button class="btn special bomb" id="bombBtn">💣<span class="badge" id="bombBadge">3</span></button>
-      <button class="btn special scorch" id="scorchBtn">🔥</button>
-      <button class="btn shoot" id="fire">🌭</button>
-    </div>
+    <button class="btn special bomb" id="bombBtn">💣<span class="badge" id="bombBadge">3</span></button>
+    <button class="btn shoot" id="fire">🌭</button>
+    <button class="btn" id="left">◀</button>
+    <button class="btn" id="right">▶</button>
+    <button class="btn special scorch" id="scorchBtn">🔥</button>
   </div>
 
   <div class="toast" id="toast"></div>

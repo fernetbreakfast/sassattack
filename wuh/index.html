@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="robots" content="noindex, noimageindex" />
+<title>WUH? — Sass Attack</title>
+<link rel="icon" type="image/png" href="/gfx/eggman_final.png" />
+<style>
+  :root{
+    color-scheme: dark;
+    --neon:#00e0ff; --hot:#ff3b6b; --gold:#ffd23f; --grn:#37ffb0;
+    --bg0:#05060f; --bg1:#0a0e22;
+    --p1:#00e0ff; --p2:#ff3b6b;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; height:100%;
+    overscroll-behavior:none;
+    background:
+      radial-gradient(1400px 900px at 50% 18%, #141a3a 0%, var(--bg1) 42%, var(--bg0) 100%);
+    color:#fff;
+    font-family:"Trebuchet MS","Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+  }
+  body{ min-height:100%; height:100svh; height:100dvh; overflow:hidden; }
+
+  /* full-screen stacked screens */
+  .screen{
+    position:fixed; inset:0; display:none; flex-direction:column; align-items:center;
+    padding:max(18px,env(safe-area-inset-top)) 18px max(18px,env(safe-area-inset-bottom));
+    overflow-y:auto;
+  }
+  .screen.show{ display:flex; }
+  .wrap{ width:min(94vw,520px); margin:auto 0; display:flex; flex-direction:column; align-items:center; text-align:center; gap:14px; }
+
+  h1.title{
+    margin:0; font-size:clamp(44px,18vw,96px); font-weight:900; letter-spacing:2px; line-height:.92;
+    background:linear-gradient(90deg,var(--neon),var(--hot),var(--gold));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    filter:drop-shadow(0 8px 30px rgba(0,224,255,.3));
+  }
+  .sub{ margin:0; color:#aeb6e0; font-size:14px; letter-spacing:.5px; line-height:1.5; }
+  .flavor{ min-height:20px; color:var(--gold); font-size:14px; font-weight:900; letter-spacing:.4px; }
+
+  .cta{
+    -webkit-tap-highlight-color:transparent;
+    display:flex; align-items:center; justify-content:center;
+    width:100%; min-height:58px; padding:14px 22px;
+    border:none; border-radius:16px; cursor:pointer;
+    font-family:inherit; font-size:clamp(17px,5vw,21px); font-weight:900; letter-spacing:1px;
+    text-decoration:none; text-transform:uppercase;
+    color:#05060f; background:linear-gradient(90deg,var(--neon),var(--grn));
+    box-shadow:0 8px 30px rgba(0,224,255,.4); transition:transform .08s ease;
+  }
+  .cta:active{ transform:translateY(2px) scale(.985); }
+  .cta.alt{ background:linear-gradient(90deg,var(--hot),var(--gold)); color:#1a0008; box-shadow:0 8px 30px rgba(255,59,107,.4); }
+  .cta:disabled{ opacity:.5; }
+
+  /* initials */
+  .who{ font-size:clamp(20px,7vw,30px); font-weight:900; letter-spacing:1px; }
+  .who.p1{ color:var(--p1); } .who.p2{ color:var(--p2); }
+  .slots{ display:flex; gap:14px; justify-content:center; margin:6px 0; }
+  .slot{ width:54px; height:64px; display:grid; place-items:center; font-size:34px; font-weight:900;
+    border-radius:12px; background:rgba(0,224,255,.08); border:2px solid rgba(0,224,255,.25); }
+  .slot.active{ border-color:var(--hot); box-shadow:0 0 22px rgba(255,59,107,.5);
+    animation:slotPulse 1.1s ease-in-out infinite; }
+  @keyframes slotPulse{ 0%,100%{ box-shadow:0 0 22px rgba(255,59,107,.5); } 50%{ box-shadow:0 0 30px rgba(255,59,107,.85); } }
+
+  /* custom on-screen keyboard (no native OS keyboard) */
+  .kbd{ display:flex; flex-direction:column; gap:6px; align-items:stretch; margin:6px 0 2px; width:100%; }
+  .kbd-row{ display:flex; gap:5px; justify-content:center; }
+  .key2{ -webkit-tap-highlight-color:transparent; cursor:pointer; flex:1 1 0; min-width:0;
+    height:44px; padding:0 2px; display:grid; place-items:center;
+    border-radius:9px; font-family:inherit; font-size:clamp(13px,4.2vw,18px); font-weight:900;
+    color:#fff; border:1px solid rgba(0,224,255,.3); background:rgba(0,224,255,.08);
+    transition:transform .05s, background .1s; }
+  .key2:active{ transform:scale(.9); background:rgba(0,224,255,.28); }
+  .key2.del{ flex:1.4 1 0; color:var(--gold); border-color:rgba(255,210,63,.45); background:rgba(255,210,63,.1); }
+  .key2.del:active{ background:rgba(255,210,63,.28); }
+
+  /* HUD scoreboard */
+  .hud{
+    width:min(94vw,520px); display:flex; gap:10px; align-items:stretch;
+    margin:0 auto 4px; padding:8px; border-radius:16px;
+    background:rgba(10,14,34,.55); border:1px solid rgba(0,224,255,.3);
+    box-shadow:0 0 24px rgba(0,224,255,.12); backdrop-filter:blur(8px);
+  }
+  .pcard{ flex:1; padding:8px 6px; border-radius:12px; background:rgba(255,255,255,.03); border:1px solid transparent; }
+  .pcard.p1{ border-color:rgba(0,224,255,.4); }
+  .pcard.p2{ border-color:rgba(255,59,107,.4); }
+  .pcard.turn{ box-shadow:0 0 18px rgba(255,210,63,.5); border-color:var(--gold); }
+  .pname{ font-size:14px; font-weight:900; letter-spacing:1px; }
+  .pcard.p1 .pname{ color:var(--p1); } .pcard.p2 .pname{ color:var(--p2); }
+  .pscore{ font-size:clamp(16px,5.5vw,22px); font-weight:900; }
+  .roundtag{ text-align:center; color:#aeb6e0; font-size:12px; letter-spacing:1px; margin:2px 0 8px; }
+
+  .qshow{ font-size:12px; font-weight:900; letter-spacing:2px; color:var(--neon); text-transform:uppercase; }
+  .qtext{ font-size:clamp(18px,5.6vw,24px); font-weight:900; line-height:1.3; margin:4px 0 6px; }
+  .opts{ display:flex; flex-direction:column; gap:10px; width:100%; }
+  .opt{
+    -webkit-tap-highlight-color:transparent; cursor:pointer; text-align:left;
+    width:100%; padding:14px 16px; border-radius:13px; font-family:inherit;
+    font-size:clamp(15px,4.4vw,18px); font-weight:700; line-height:1.25;
+    color:#fff; border:1px solid rgba(0,224,255,.3); background:rgba(0,224,255,.07);
+    transition:transform .05s, background .12s; }
+  .opt:active{ transform:scale(.99); }
+  .opt.correct{ background:rgba(55,255,176,.22); border-color:var(--grn); color:#eafff6; }
+  .opt.wrong{ background:rgba(255,59,107,.22); border-color:var(--hot); }
+  .opt:disabled{ cursor:default; }
+
+  .big{ font-size:clamp(30px,11vw,56px); font-weight:900; line-height:1;
+    background:linear-gradient(90deg,var(--gold),var(--hot)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .winner-ini{ font-size:clamp(40px,16vw,84px); font-weight:900; letter-spacing:4px; }
+  .pickgrid{ display:flex; flex-direction:column; gap:12px; width:100%; }
+  .foot{ color:#8b93c0; font-size:12px; letter-spacing:.5px; }
+  .toast{
+    position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px);
+    background:rgba(10,14,34,.92); border:1px solid rgba(255,59,107,.5); color:#fff;
+    padding:10px 18px; border-radius:12px; font-size:13px; opacity:0; pointer-events:none;
+    transition:opacity .2s, transform .2s; z-index:60; max-width:90vw; text-align:center; }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+  <!-- TITLE -->
+  <section class="screen show" id="scrTitle">
+    <div class="wrap">
+      <h1 class="title">WUH?</h1>
+      <p class="sub">Two players. One phone. Five rounds of TV trivia.<br>Loser passes the phone. Winner gets the glory.</p>
+      <button class="cta" id="btnStart">Start</button>
+      <p class="foot">&#129370; sassybreakfa.st &middot; hot-seat trivia</p>
+    </div>
+  </section>
+
+  <!-- INITIALS -->
+  <section class="screen" id="scrInitials">
+    <div class="wrap">
+      <div class="who" id="iniWho">PLAYER 1</div>
+      <p class="sub">Tap the keys to enter your initials (3 chars)</p>
+      <div class="slots"><div class="slot" id="s0">A</div><div class="slot" id="s1">A</div><div class="slot" id="s2">A</div></div>
+      <div class="kbd" id="keyboard" aria-label="On-screen keyboard"></div>
+      <button class="cta" id="btnIniNext">Lock it in</button>
+    </div>
+  </section>
+
+  <!-- PASS interstitial -->
+  <section class="screen" id="scrPass">
+    <div class="wrap">
+      <p class="sub">Heads down, everyone else!</p>
+      <div class="who" id="passWho">PASS TO PLAYER 1</div>
+      <p class="flavor" id="passFlavor"></p>
+      <button class="cta alt" id="btnReady">I'm ready &mdash; show my question</button>
+    </div>
+  </section>
+
+  <!-- QUESTION -->
+  <section class="screen" id="scrQuestion">
+    <div class="hud" id="hud">
+      <div class="pcard p1" id="card0"><div class="pname" id="pn0">P1</div><div class="pscore" id="ps0">0</div></div>
+      <div class="pcard p2" id="card1"><div class="pname" id="pn1">P2</div><div class="pscore" id="ps1">0</div></div>
+    </div>
+    <div class="roundtag" id="roundTag">ROUND 1 of 5</div>
+    <div class="wrap" style="gap:10px; margin-top:0;">
+      <div class="qshow" id="qShow">SNL</div>
+      <div class="qtext" id="qText">Question</div>
+      <div class="opts" id="opts"></div>
+      <p class="flavor" id="qFlavor"></p>
+      <button class="cta" id="btnContinue" style="display:none;">Continue</button>
+    </div>
+  </section>
+
+  <!-- TIEBREAK -->
+  <section class="screen" id="scrTie">
+    <div class="wrap">
+      <div class="big">SUDDEN DEATH</div>
+      <p class="sub" id="tieMsg">Dead even. One question each &mdash; first to pull ahead takes it all.</p>
+      <button class="cta alt" id="btnTie">Bring it on</button>
+    </div>
+  </section>
+
+  <!-- WIN -->
+  <section class="screen" id="scrWin">
+    <div class="wrap">
+      <p class="sub">WINNER</p>
+      <div class="winner-ini" id="winIni">AAA</div>
+      <div class="big" id="winScore">0</div>
+      <p class="flavor" id="winFlavor"></p>
+      <div id="rewardPick" style="width:100%;">
+        <p class="sub">Spoils of war: drop a <b>1,000,000</b> bonus onto one board under your name.</p>
+        <div class="pickgrid">
+          <button class="cta reward-btn" data-game="new">NG</button>
+          <button class="cta alt reward-btn" data-game="old">OG</button>
+          <button class="cta reward-btn" data-game="memory">GYUH</button>
+        </div>
+      </div>
+      <p class="sub" id="rewardMsg" style="display:none;"></p>
+      <button class="cta alt" id="btnAgain" style="display:none;">Play again</button>
+    </div>
+  </section>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+
+  /* ===== leaderboard endpoints (reward lands on the chosen game's board) ===== */
+  const SCORE_ENDPOINT  = 'https://api.sassybreakfa.st/log/hscore.php';
+  const SCORES_ENDPOINT = 'https://api.sassybreakfa.st/log/leaderboard.php';
+  const SCORE_TOKEN     = 'thesasshastheass';
+  const BONUS           = 1000000;
+
+  function fetchT(url, opts = {}, ms = 3500){
+    const c = new AbortController();
+    const t = setTimeout(() => c.abort(), ms);
+    return fetch(url, {...opts, signal: c.signal}).finally(() => clearTimeout(t));
+  }
+
+  /* ===== immersive / fullscreen (best effort, never throws) ===== */
+  function goImmersive(){
+    try{ const el=document.documentElement;
+      const rfs=el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen;
+      if(rfs){ const pr=rfs.call(el); if(pr&&pr.catch) pr.catch(()=>{}); }
+    }catch(e){}
+    try{ if(screen.orientation&&screen.orientation.lock){ const po=screen.orientation.lock('portrait'); if(po&&po.catch) po.catch(()=>{}); } }catch(e){}
+  }
+
+  /* ===== question bank — 50 vetted questions, embedded verbatim ===== */
+  const BANK_RAW = `
+SNL | Who hosted the very first SNL episode in October 1975? | A) Chevy Chase | B) George Carlin | C) Richard Pryor | D) Steve Martin | correct:B
+SNL | Who were the musical guests on SNL's first-ever episode? | A) Billy Preston & Janis Ian | B) Simon & Garfunkel | C) Patti Smith & Paul Simon | D) ABBA | correct:A
+SNL | What was the show originally called when it premiered in 1975? | A) Saturday Night Live | B) NBC's Saturday Night | C) Saturday Night with Howard Cosell | D) The Prime Time Players | correct:B
+SNL | The original 1975 cast was billed as the ___? | A) Not Ready for Prime Time Players | B) Second City Seven | C) Wild and Crazy Players | D) Sunday Funnies | correct:A
+SNL | In the early 1980s, producer Dick Ebersol let the audience vote off which performer (who never returned)? | A) Andy Kaufman | B) Joe Piscopo | C) Eddie Murphy | D) Martin Short | correct:A
+SNL | In 1977 which musical guest stopped "Less Than Zero" mid-song and launched into "Radio, Radio" against the show's wishes? | A) Elvis Costello | B) Frank Zappa | C) Tom Petty | D) The Sex Pistols | correct:A
+SNL | In 1992 which musical guest tore up a photo of Pope John Paul II live on air? | A) Sinéad O'Connor | B) Madonna | C) Cyndi Lauper | D) Joan Jett | correct:A
+SNL | On the first episode, Andy Kaufman lip-synced one line of which theme song? | A) Mighty Mouse | B) Superman | C) Popeye | D) Spider-Man | correct:A
+SNL | Who created Saturday Night Live? | A) Lorne Michaels | B) Dick Ebersol | C) Dan Aykroyd | D) Bernie Brillstein | correct:A
+SNL | Which recurring character did Gilda Radner play? | A) Roseanne Roseannadanna | B) Emily Litella | C) Baba Wawa | D) All of the above | correct:D
+SNL | Who holds the record as the longest-tenured SNL cast member? | A) Kenan Thompson | B) Darrell Hammond | C) Fred Armisen | D) Seth Meyers | correct:A
+SNL | In "More Cowbell," who played producer Bruce Dickinson? | A) Christopher Walken | B) Will Ferrell | C) Chris Parnell | D) Jimmy Fallon | correct:A
+SNL | Who played the Catholic-schoolgirl character Mary Katherine Gallagher? | A) Molly Shannon | B) Cheri Oteri | C) Ana Gasteyer | D) Rachel Dratch | correct:A
+SNL | Garth Algar in the "Wayne's World" sketches was played by? | A) Dana Carvey | B) Mike Myers | C) Adam Sandler | D) David Spade | correct:A
+SNL | Norm Macdonald was fired from Weekend Update after repeatedly mocking which celebrity? | A) O.J. Simpson | B) Michael Jackson | C) David Letterman | D) Frank Stallone | correct:A
+SNL | Which future star wrote and starred in "Lazy Sunday" and "Dick in a Box" as part of The Lonely Island? | A) Andy Samberg | B) Pete Davidson | C) Bobby Moynihan | D) Beck Bennett | correct:A
+SNL | Which were recurring Eddie Murphy characters? | A) Mister Robinson | B) Buckwheat | C) Gumby | D) All of the above | correct:D
+SNL | Chris Farley's motivational-speaker character who lived "in a van down by the river" was named? | A) Matt Foley | B) Tommy Callahan | C) Bennett Brauer | D) Todd O'Connor | correct:A
+SNL | How does every SNL episode open? | A) "Live from New York, it's Saturday Night!" | B) "It's Saturday Night Live!" | C) "Welcome to Saturday Night." | D) "And now, SNL." | correct:A
+SNL | How did Chevy Chase open Weekend Update? | A) "I'm Chevy Chase, and you're not." | B) "Live from New York..." | C) "Well, isn't that special?" | D) "Two wild and crazy guys." | correct:A
+CHEERS | Sam Malone was a former relief pitcher for which team? | A) Boston Red Sox | B) New York Yankees | C) Chicago Cubs | D) Boston Braves | correct:A
+CHEERS | Sam Malone's nickname as a pitcher was? | A) Mayday | B) Wild Thing | C) The Kid | D) Cy | correct:A
+CHEERS | What was Cliff Clavin's job? | A) Mail carrier | B) Accountant | C) Plumber | D) Cab driver | correct:A
+CHEERS | Cheers is set in which city? | A) Boston | B) Chicago | C) New York | D) Providence | correct:A
+CHEERS | Besides Sam and Carla, which character appeared in every episode? | A) Norm Peterson | B) Cliff Clavin | C) Woody | D) Frasier | correct:A
+CHEERS | The real Boston bar that inspired the Cheers exterior was originally named? | A) The Bull & Finch | B) The Hancock | C) Cheers | D) The Beacon | correct:A
+CHEERS | The theme song says it's a place where everybody knows your ___? | A) name | B) drink | C) face | D) story | correct:A
+CHEERS | Who came in to tend bar after the character Coach was written out (following the actor's death)? | A) Woody Boyd | B) Cliff | C) Frasier | D) Rebecca | correct:A
+CHEERS | Sam's bar manager and love interest in the later seasons was? | A) Rebecca Howe | B) Diane Chambers | C) Lilith | D) Carla | correct:A
+CHEERS | Which Cheers character got his own hit spin-off series? | A) Frasier Crane | B) Norm | C) Cliff | D) Woody | correct:A
+SUNNY | The Gang runs which bar? | A) Paddy's Pub | B) MacLaren's | C) The Drunken Clam | D) Moe's Tavern | correct:A
+SUNNY | It's Always Sunny is set in which city? | A) Philadelphia | B) Boston | C) Pittsburgh | D) Newark | correct:A
+SUNNY | Which star joined in season 2 as Frank Reynolds? | A) Danny DeVito | B) Joe Pesci | C) Christopher Lloyd | D) Jon Voight | correct:A
+SUNNY | "The Nightman Cometh" is a ___ created by Charlie? | A) musical | B) board game | C) painting | D) restaurant | correct:A
+SUNNY | Charlie's cat-repellent product pitch is called? | A) Kitten Mittens | B) Cat Boots | C) Paw Pals | D) Mouse House | correct:A
+SUNNY | With its 15th season, the show became the longest-running live-action American ___ by number of seasons? | A) sitcom | B) drama | C) variety show | D) soap opera | correct:A
+SUNNY | The show originally airs on which network? | A) FX | B) HBO | C) NBC | D) Comedy Central | correct:A
+SUNNY | The menial bar tasks Charlie does (like rat extermination) are known as? | A) Charlie Work | B) Grunt Duty | C) The Slog | D) Mac's List | correct:A
+SUNNY | Dennis and Dee Reynolds are? | A) Twins | B) Cousins | C) Married | D) Father and daughter | correct:A
+SUNNY | Frank's disguise where he paints himself green to be "invisible" is called? | A) Green Man | B) The Hulk | C) Greenie | D) Mantis | correct:A
+WIRE | The Wire is set in which city? | A) Baltimore | B) Washington D.C. | C) Philadelphia | D) Newark | correct:A
+WIRE | Creator David Simon was previously a journalist for which paper? | A) The Baltimore Sun | B) The Washington Post | C) The New York Times | D) The Philadelphia Inquirer | correct:A
+WIRE | Which character was a shotgun-toting stick-up man who robbed drug dealers? | A) Omar Little | B) Stringer Bell | C) Avon Barksdale | D) Bubbles | correct:A
+WIRE | Omar's catchphrase, shouted as he approached, was? | A) "Omar comin'!" | B) "Game time!" | C) "Money first!" | D) "Wake up!" | correct:A
+WIRE | Stringer Bell was played by which actor? | A) Idris Elba | B) Michael K. Williams | C) Wood Harris | D) Dominic West | correct:A
+WIRE | The Season 3 free zone where police allowed open drug dealing was nicknamed? | A) Hamsterdam | B) The Pit | C) Free Town | D) The Towers | correct:A
+WIRE | Season 2 of The Wire focused on which Baltimore institution? | A) The docks / port union | B) The public schools | C) City Hall politics | D) The newspaper | correct:A
+WIRE | Detective Jimmy McNulty was played by which (British) actor? | A) Dominic West | B) Idris Elba | C) Aidan Gillen | D) Dominic Cooper | correct:A
+WIRE | A much-quoted line about the drug trade is "The game is ___." | A) the game | B) over | C) rigged | D) everything | correct:A
+WIRE | The recovering-addict informant who helps the detail is named? | A) Bubbles | B) Bodie | C) Wallace | D) Cutty | correct:A
+`;
+
+  // Parse pipe-delimited lines into {show, q, opts[4], correct}. Option order is preserved.
+  function parseBank(raw){
+    const out = [];
+    raw.split('\n').forEach(line => {
+      const t = line.trim();
+      if(!t) return;
+      const parts = t.split(' | ').map(p => p.trim());
+      if(parts.length !== 7) return;
+      const show = parts[0];
+      const q = parts[1];
+      const opts = [parts[2], parts[3], parts[4], parts[5]]; // "A) ...", "B) ...", etc — kept in order
+      const letter = parts[6].replace('correct:', '').trim().toUpperCase();
+      const correct = {A:0,B:1,C:2,D:3}[letter];
+      out.push({ show, q, opts, correct });
+    });
+    return out;
+  }
+  const BANK = parseBank(BANK_RAW);
+
+  function shuffle(a){ const x = a.slice(); for(let i=x.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [x[i],x[j]]=[x[j],x[i]]; } return x; }
+
+  /* ===== flavor text ===== */
+  const PASS_FLAVOR = [
+    'No peeking, cheaters never WUH.',
+    'Hand it over. Gently. It bites.',
+    'Your time to shine, or to whiff. Probably whiff.',
+    'The phone has chosen you.',
+    'Eyes on the prize, brain in gear.',
+    'Don\'t embarrass yourself. Or do, it\'s funnier.'
+  ];
+  const RIGHT_FLAVOR = [
+    'A MILLION POINTS. Filthy.',
+    'Correct! The crowd goes mild.',
+    'Big brain energy. +1,000,000.',
+    'You absolute trivia gremlin. Nailed it.',
+    'Money. Straight cash. A million of it.'
+  ];
+  const WRONG_FLAVOR = [
+    'Nope. Zero dollars. Zero cents.',
+    'Wrong. The sass is disappointed.',
+    'Swing and a miss, slugger.',
+    'That\'s a no from the judges.',
+    'Bold guess. Wildly incorrect.'
+  ];
+  const WIN_FLAVOR = [
+    'Undisputed. Lord of the couch.',
+    'Champion of the hot seat.',
+    'The other one is still crying. Ignore them.',
+    'Bow before the trivia monarch.',
+    'Certified WUH.'
+  ];
+  const pick = a => a[Math.floor(Math.random()*a.length)];
+
+  /* ===== state ===== */
+  const players = [{ini:'AAA',score:0},{ini:'AAA',score:0}];
+  let deck = [];          // shuffled bank, draw pointer based
+  let drawPtr = 0;
+  let turns = [];         // [{player, q}] length 10
+  let tIdx = 0;
+  let starter = 0;        // who leads round 1 (alternates each round)
+  let suddenDeath = false;
+  let sdRound = 0, sdStarter = 0, sdTurns = [], sdIdx = 0, sdRoundScore = [0,0];
+
+  function draw(){
+    if(drawPtr >= deck.length){ deck = deck.concat(shuffle(BANK)); } // safety refill for long sudden death
+    return deck[drawPtr++];
+  }
+
+  /* ===== screen switching ===== */
+  function show(id){
+    document.querySelectorAll('.screen').forEach(s => s.classList.toggle('show', s.id === id));
+    const sc = $(id); if(sc) sc.scrollTop = 0;
+  }
+  function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),1800); }
+
+  /* ===== INITIALS — custom on-screen keyboard (no native OS keyboard) ===== */
+  let iniTarget = 0;            // which player is entering
+  let letters = ['A','A','A'];
+  let pos = 0;                  // 0..3 (active slot = min(pos,2))
+  const slotEls = [$('s0'),$('s1'),$('s2')];
+  function activeSlot(){ return Math.min(pos,2); }
+  function renderSlots(){ const a=activeSlot(); slotEls.forEach((s,i)=>{ s.textContent=letters[i]; s.classList.toggle('active', i===a); }); }
+  function typeChar(ch){ const c=String(ch).toUpperCase(); if(!/[A-Z0-9]/.test(c)) return; letters[activeSlot()]=c; pos=Math.min(pos+1,3); renderSlots(); }
+  function typeBackspace(){ pos=Math.max(pos-1,0); letters[activeSlot()]='A'; renderSlots(); }
+  function buildKeyboard(){
+    const kb=$('keyboard'); if(!kb || kb.dataset.built) return;
+    const rows=['ABCDEFGHI','JKLMNOPQR','STUVWXYZ','0123456789'];
+    rows.forEach((row,ri)=>{
+      const r=document.createElement('div'); r.className='kbd-row';
+      for(const ch of row){ const k=document.createElement('button'); k.type='button'; k.className='key2'; k.textContent=ch; k.addEventListener('click',()=>typeChar(ch)); r.appendChild(k); }
+      if(ri===2){ const del=document.createElement('button'); del.type='button'; del.className='key2 del'; del.innerHTML='&#9003;'; del.setAttribute('aria-label','Backspace'); del.addEventListener('click',typeBackspace); r.appendChild(del); }
+      kb.appendChild(r);
+    });
+    kb.dataset.built='1';
+  }
+  function openInitials(target){
+    iniTarget=target; letters=['A','A','A']; pos=0;
+    const who=$('iniWho'); who.textContent='PLAYER '+(target+1)+' — ENTER INITIALS';
+    who.className='who '+(target===0?'p1':'p2');
+    renderSlots(); show('scrInitials');
+  }
+  $('btnIniNext').addEventListener('click', ()=>{
+    const ini = letters.join('').toUpperCase().replace(/[^A-Z0-9]/g,'').padEnd(3,'A').slice(0,3);
+    players[iniTarget].ini = ini;
+    if(iniTarget===0){ openInitials(1); }
+    else { beginMatch(); }
+  });
+  // desktop physical keyboard (no focused field → no OS keyboard)
+  document.addEventListener('keydown', e=>{
+    if(!$('scrInitials').classList.contains('show')) return;
+    const k=e.key;
+    if(k==='Enter'){ e.preventDefault(); $('btnIniNext').click(); }
+    else if(k==='Backspace'){ e.preventDefault(); typeBackspace(); }
+    else if(k.length===1 && /[A-Za-z0-9]/.test(k)){ e.preventDefault(); typeChar(k); }
+  });
+
+  /* ===== MATCH SETUP ===== */
+  function beginMatch(){
+    players[0].score=0; players[1].score=0;
+    deck = shuffle(BANK); drawPtr = 0;
+    starter = Math.random() < 0.5 ? 0 : 1;   // random initial lead, then alternate each round
+    turns = [];
+    for(let r=0;r<5;r++){
+      const first = (starter + r) % 2;
+      turns.push({ player:first, q:draw() });
+      turns.push({ player:1-first, q:draw() });
+    }
+    tIdx = 0; suddenDeath = false;
+    updateHud();
+    nextTurn();
+  }
+
+  function updateHud(){
+    $('pn0').textContent = players[0].ini; $('pn1').textContent = players[1].ini;
+    $('ps0').textContent = players[0].score.toLocaleString();
+    $('ps1').textContent = players[1].score.toLocaleString();
+  }
+
+  /* ===== TURN FLOW ===== */
+  function nextTurn(){
+    if(suddenDeath){ return sdNextTurn(); }
+    if(tIdx >= turns.length){ return endMatch(); }
+    const turn = turns[tIdx];
+    const rnd = Math.floor(tIdx/2)+1;
+    showPass(turn.player, 'ROUND '+rnd+' of 5', ()=>askQuestion(turn.player, turn.q, 'ROUND '+rnd+' of 5'));
+  }
+
+  function showPass(playerIdx, roundLabel, after){
+    $('passWho').textContent = 'PASS TO ' + players[playerIdx].ini;
+    $('passWho').className = 'who '+(playerIdx===0?'p1':'p2');
+    $('passFlavor').textContent = pick(PASS_FLAVOR);
+    const btn=$('btnReady');
+    btn.onclick = ()=>{ $('roundTag').textContent = roundLabel; after(); };
+    show('scrPass');
+  }
+
+  function askQuestion(playerIdx, q, roundLabel){
+    updateHud();
+    $('card0').classList.toggle('turn', playerIdx===0);
+    $('card1').classList.toggle('turn', playerIdx===1);
+    $('roundTag').textContent = roundLabel + ' — ' + players[playerIdx].ini + "'S TURN";
+    $('qShow').textContent = q.show;
+    $('qText').textContent = q.q;
+    $('qFlavor').textContent = '';
+    const cont=$('btnContinue'); cont.style.display='none';
+    const wrap=$('opts'); wrap.innerHTML='';
+    q.opts.forEach((label, i)=>{
+      const b=document.createElement('button');
+      b.type='button'; b.className='opt'; b.textContent=label;   // textContent → no HTML-escaping worries
+      b.addEventListener('click', ()=>answer(playerIdx, q, i, wrap, cont));
+      wrap.appendChild(b);
+    });
+    show('scrQuestion');
+  }
+
+  function answer(playerIdx, q, choice, wrap, cont){
+    const btns=[...wrap.querySelectorAll('.opt')];
+    btns.forEach((b,i)=>{ b.disabled=true; if(i===q.correct) b.classList.add('correct'); if(i===choice && choice!==q.correct) b.classList.add('wrong'); });
+    const right = choice===q.correct;
+    if(right){ players[playerIdx].score += BONUS; }
+    updateHud();
+    $('qFlavor').textContent = right ? pick(RIGHT_FLAVOR) : pick(WRONG_FLAVOR);
+    cont.style.display='flex';
+    cont.textContent = (tIdx >= (suddenDeath?1:turns.length)-1 && !nextExists()) ? 'See result' : 'Continue';
+    cont.onclick = ()=>{ if(suddenDeath){ sdAfterAnswer(playerIdx, right); } else { tIdx++; nextTurn(); } };
+  }
+  function nextExists(){ return suddenDeath ? (sdIdx < sdTurns.length-1) : (tIdx < turns.length-1); }
+
+  /* ===== END / WINNER ===== */
+  function endMatch(){
+    const a=players[0].score, b=players[1].score;
+    if(a===b){ startSuddenDeath(); return; }
+    declareWinner(a>b?0:1);
+  }
+
+  function startSuddenDeath(){
+    suddenDeath = true; sdRound = 0; sdStarter = Math.random()<0.5?0:1;
+    $('tieMsg').textContent = 'Dead even at ' + players[0].score.toLocaleString() + '. One question each — first to pull ahead takes it all.';
+    $('btnTie').onclick = ()=> sdStartRound();
+    show('scrTie');
+  }
+  function sdStartRound(){
+    const first = (sdStarter + sdRound) % 2;
+    sdTurns = [ {player:first, q:draw()}, {player:1-first, q:draw()} ];
+    sdIdx = 0; sdRoundScore = [0,0];
+    sdNextTurn();
+  }
+  function sdNextTurn(){
+    if(sdIdx >= sdTurns.length){ // both answered this SD round
+      if(sdRoundScore[0] !== sdRoundScore[1]){ declareWinner(sdRoundScore[0] > sdRoundScore[1] ? 0 : 1); }
+      else { sdRound++; toast('Still tied! Sudden death round ' + (sdRound+1)); setTimeout(sdStartRound, 700); }
+      return;
+    }
+    const turn = sdTurns[sdIdx];
+    showPass(turn.player, 'SUDDEN DEATH', ()=>askQuestion(turn.player, turn.q, 'SUDDEN DEATH'));
+  }
+  function sdAfterAnswer(playerIdx, right){
+    if(right) sdRoundScore[playerIdx] += 1;
+    sdIdx++;
+    sdNextTurn();
+  }
+
+  function declareWinner(winIdx){
+    suddenDeath = false;
+    players[winIdx].score += BONUS;   // winner bonus
+    const w = players[winIdx];
+    $('winIni').textContent = w.ini;
+    $('winIni').style.color = winIdx===0 ? 'var(--p1)' : 'var(--p2)';
+    $('winScore').textContent = w.score.toLocaleString() + ' pts';
+    $('winFlavor').textContent = pick(WIN_FLAVOR) + ' (+1,000,000 winner bonus)';
+    $('rewardPick').style.display='block';
+    $('rewardMsg').style.display='none';
+    $('btnAgain').style.display='none';
+    // wire reward buttons (fresh handlers each time)
+    document.querySelectorAll('.reward-btn').forEach(btn=>{
+      btn.disabled=false;
+      btn.onclick = ()=> awardReward(btn.getAttribute('data-game'), w.ini);
+    });
+    show('scrWin');
+  }
+
+  /* ===== REWARD: drop 1,000,000 onto the chosen game's board under winner's initials ===== */
+  async function awardReward(gameId, ini){
+    document.querySelectorAll('.reward-btn').forEach(b=>b.disabled=true);
+    const label = {new:'NG', old:'OG', memory:'GYUH'}[gameId] || gameId;
+    $('rewardMsg').style.display='block';
+    $('rewardMsg').textContent = 'Dropping the bomb on ' + label + '…';
+    const runId = Date.now().toString(36) + Math.random().toString(36).slice(2,10);
+    const h = { 'Content-Type':'application/json', 'X-Score-Token': SCORE_TOKEN };
+    // leaderboard.php
+    try{
+      await fetchT(SCORES_ENDPOINT, { method:'POST', headers:h, body: JSON.stringify({
+        score: BONUS, initials: ini, run_id: runId, mode:'', game: gameId
+      }) });
+    }catch(e){}
+    // hscore.php
+    try{
+      await fetchT(SCORE_ENDPOINT, { method:'POST', headers:h, body: JSON.stringify({
+        score: BONUS, initials: ini, game: gameId
+      }) });
+    }catch(e){}
+    // confirmation either way (network failure never hangs — both calls are timeout-bounded)
+    $('rewardPick').style.display='none';
+    $('rewardMsg').textContent = ini + ' just dropped 1,000,000 onto ' + label + '. Check the board.';
+    $('btnAgain').style.display='flex';
+  }
+
+  /* ===== wiring ===== */
+  buildKeyboard();
+  $('btnStart').addEventListener('click', ()=>{ goImmersive(); openInitials(0); });
+  $('btnAgain').addEventListener('click', ()=>{ openInitials(0); });
+
+})();
+</script>
+</body>
+</html>

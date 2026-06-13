@@ -81,6 +81,8 @@
   .tile.revealed canvas{ opacity:.34; }
   /* a tile lit during the sequence or correct tap shows full slice + glow */
   .tile.flash canvas{ opacity:1; }
+  /* CHEAT: reveal the full solved photo (all tiles at full opacity) */
+  .grid.solution .tile canvas{ opacity:1; }
   .tile.flash{ box-shadow:0 0 26px rgba(0,224,255,.8), inset 0 0 22px rgba(0,224,255,.25);
     border-color:var(--neon); transform:scale(.97); filter:saturate(1.3) brightness(1.15); }
   .tile.wrong{ box-shadow:0 0 26px rgba(255,59,107,.8); border-color:var(--hot);
@@ -468,6 +470,8 @@
   let runId = '';
   let revealed = [];         // booleans: which tiles are permanently revealed
   let tileEls = [];          // tile DOM nodes
+  let cornerBuf = [];        // rolling buffer of the last 8 tile presses (cheat detect)
+  let cheatTimer = null;     // timer for the timed "solution" peek
   let imgEl = null;          // the user-chosen image (HTMLImageElement); takes priority
   let imgReady = false;      // true once the user has picked their own photo
   let gameImg = null;        // the image actually sliced for the current game
@@ -713,6 +717,8 @@
     sequence = []; round = 0;
     cleared = 0; score = 0;
     livesLeft = MODE.lives; triviaUsed = false; pendingBadTile = null;
+    cornerBuf = []; if(cheatTimer){ clearTimeout(cheatTimer); cheatTimer = null; }
+    gridEl.classList.remove('solution');
     renderLives(); renderScore();
     playing = true;
     startOv.classList.remove('show');
@@ -728,7 +734,42 @@
     setTimeout(() => playSequence(), round > 1 ? 700 : 200);
   }
 
+  /* ===== CHEAT: corner-clockwise reveal of the solved photo =====
+     Corners for the active NxN grid: TL=0, TR=N-1, BR=N*N-1, BL=N*(N-1).
+     The cheat is a TIMED PEEK: it reveals the full image for ~3.5s, then the
+     puzzle returns to its normal reveal state. It does NOT auto-win the round. */
+  function cheatPattern(){
+    const TL = 0, TR = N - 1, BR = N * N - 1, BL = N * (N - 1);
+    return [TL, TL, TR, TR, BR, BR, BL, BL];
+  }
+  function cheatMatches(){
+    if(cornerBuf.length < 8) return false;
+    const p = cheatPattern();
+    for(let k = 0; k < 8; k++){ if(cornerBuf[k] !== p[k]) return false; }
+    return true;
+  }
+  function fireCheat(){
+    gridEl.classList.add('solution');           // every tile canvas -> full opacity
+    setCaption('CHEAT: solution revealed \uD83D\uDC41', 'good');
+    blip(880, 'sine', 0.18, 0.4);
+    if(cheatTimer) clearTimeout(cheatTimer);
+    cheatTimer = setTimeout(() => {
+      gridEl.classList.remove('solution');       // back to the normal reveal state
+      cheatTimer = null;
+    }, 3500);
+  }
+
   function onTileTap(i){
+    // CHEAT DETECT (runs before the guess logic and regardless of input phase,
+    // so it never registers as a wrong/right guess — the cheat takes precedence).
+    // Pattern: each CORNER tile twice, CLOCKWISE from top-left:
+    // TL,TL, TR,TR, BR,BR, BL,BL. Requires >= 3 rounds (squares) solved.
+    cornerBuf.push(i); if(cornerBuf.length > 8) cornerBuf.shift();
+    if(playing && cleared >= 3 && cheatMatches()){
+      cornerBuf = [];        // consume the pattern
+      fireCheat();
+      return;                // this tap is NOT counted as a guess
+    }
     if(!acceptingInput || !playing) return;
     const expected = sequence[inputIdx];
     if(i === expected){
@@ -921,17 +962,18 @@
      only keeps casual visitors out; never put anything sensitive behind it. */
   (function pinGate(){
     const PIN = '1025';
-    const PIN_KEY = 'gyuh_unlocked_v1';   // remembered per-device so we don't re-prompt
+    // The PIN is required on EVERY load of /mem/ — we deliberately do NOT
+    // persist the unlock in localStorage, so the player re-enters 1025 each
+    // time the page is opened.
     const gate = $('pinGate');
     if(!gate) return;
-    if(store.get(PIN_KEY) === '1'){ gate.classList.remove('show'); return; }
     const dotsWrap = $('pinDots'), errEl = $('pinErr'), card = gate.querySelector('.card');
     let entry = '';
     function renderDots(){
       const dots = dotsWrap.querySelectorAll('.pinDot');
       dots.forEach((d,i) => d.classList.toggle('on', i < entry.length));
     }
-    function unlock(){ store.set(PIN_KEY, '1'); gate.classList.remove('show'); }
+    function unlock(){ gate.classList.remove('show'); }  // no persistence: gate returns next load
     function reject(){
       errEl.textContent = 'Nope. Try again.';
       card.classList.add('shake');

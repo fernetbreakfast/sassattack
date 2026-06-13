@@ -245,9 +245,9 @@
       <h1>SASS ATTACK</h1>
       <p class="sub" style="margin-bottom:10px;">🐣 vs the breakfast underworld.<br>Pick your pain level.</p>
       <div class="modes">
-        <button class="mode" data-mode="sunny"><div class="me1">🍳</div><div class="me2">SUNNY SIDE</div><div class="me3">6 ♥ · gentle · x1</div></button>
-        <button class="mode" data-mode="spicy"><div class="me1">🌶️</div><div class="me2">SPICY</div><div class="me3">5 ♥ · classic · x1.5</div></button>
-        <button class="mode" data-mode="death"><div class="me1">💀</div><div class="me2">SASS DEATH</div><div class="me3">4 ♥ · brutal · x3</div></button>
+        <button class="mode" data-mode="sunny"><div class="me1">🍳</div><div class="me2">SUNNY SIDE</div><div class="me3">7 ♥ · gentle · x1</div></button>
+        <button class="mode" data-mode="spicy"><div class="me1">🌶️</div><div class="me2">SPICY</div><div class="me3">6 ♥ · classic · x1.5</div></button>
+        <button class="mode" data-mode="death"><div class="me1">💀</div><div class="me2">SASS DEATH</div><div class="me3">5 ♥ · brutal · x3</div></button>
       </div>
       <button class="cta" id="startBtn">PRESS START</button>
       <div class="row">
@@ -275,9 +275,9 @@
 
       <div class="rule-sec">
         <h3>🍳🌶️💀 DIFFICULTY</h3>
-        <p><b>🍳 Sunny Side</b> — 6 ♥, slow and gentle, generous drops, bosses arrive late. A warm welcome. Scores count x1.</p>
-        <p><b>🌶️ Spicy</b> — 5 ♥, the classic pace. Scores count <span class="tag">x1.5</span>.</p>
-        <p><b>💀 Sass Death</b> — 4 ♥, fast and mean, bosses from wave 1, a <b>double</b> Mirror Match at wave 7, scorched earth costs 25%. Brutal but beatable. Scores count <span class="tag">x3</span>.</p>
+        <p><b>🍳 Sunny Side</b> — 7 ♥, slow and gentle, generous drops, bosses arrive late. A warm welcome. Scores count x1.</p>
+        <p><b>🌶️ Spicy</b> — 6 ♥, the classic pace. Scores count <span class="tag">x1.5</span>.</p>
+        <p><b>💀 Sass Death</b> — 5 ♥, fast and mean, bosses from wave 1, a <b>double</b> Mirror Match at wave 7, scorched earth costs 25%. Brutal but beatable. Scores count <span class="tag">x3</span>.</p>
       </div>
 
       <div class="rule-sec">
@@ -429,9 +429,9 @@
 
   /* ===== DIFFICULTY ===== */
   const MODES={
-    sunny:{e:'🍳',name:'SUNNY SIDE', lives:6, spd:0.85,fire:0.85,drop:0.15, bdrop:0.9, mWave:8, mCount:1, mul:1,   scorch:0.20, bossWave:3, unlockShift:0, maxBomb:5, maxLife:8},
-    spicy:{e:'🌶️',name:'SPICY',      lives:5, spd:0.94,fire:1.0, drop:0.12, bdrop:0.9, mWave:8, mCount:1, mul:1.5, scorch:0.20, bossWave:2, unlockShift:0, maxBomb:4, maxLife:7},
-    death:{e:'💀',name:'SASS DEATH', lives:4, spd:1.02,fire:1.85, drop:0.06, bdrop:0.8, mWave:7, mCount:2, mul:3,   scorch:0.25, bossWave:1, unlockShift:1, maxBomb:2, maxLife:6}
+    sunny:{e:'🍳',name:'SUNNY SIDE', lives:7, spd:0.85,fire:0.85,drop:0.15, bdrop:0.9, mWave:8, mCount:1, mul:1,   scorch:0.20, bossWave:3, unlockShift:0, maxBomb:5, maxLife:9},
+    spicy:{e:'🌶️',name:'SPICY',      lives:6, spd:0.94,fire:1.0, drop:0.12, bdrop:0.9, mWave:8, mCount:1, mul:1.5, scorch:0.20, bossWave:2, unlockShift:0, maxBomb:4, maxLife:8},
+    death:{e:'💀',name:'SASS DEATH', lives:5, spd:1.02,fire:1.85, drop:0.06, bdrop:0.8, mWave:7, mCount:2, mul:3,   scorch:0.25, bossWave:1, unlockShift:1, maxBomb:2, maxLife:7}
   };
   let modeKey=store.get('sass_mode')||'sunny';
   if(!MODES[modeKey])modeKey='sunny';

@@ -462,19 +462,15 @@ function speak(txt){
   if(!voiceOn||!txt) return;
   duckMusic(true);
   const done=()=>duckMusic(false);
-  if(current&&current.id==='chase'){
-    try{ const a=getChaseAudio(); a.muted=false; a.currentTime=0; a.onended=done; a.onerror=done;
-      const pr=a.play(); if(pr&&pr.catch)pr.catch(done);
-    }catch{ done(); }
-  } else {
-    try{ const ss=window.speechSynthesis;
-      if(!ss){ done(); return; }
-      ss.cancel();
-      const u=new SpeechSynthesisUtterance(txt);
-      u.rate=1; u.pitch=1; u.onend=done; u.onerror=done;
-      ss.speak(u);
-    }catch{ done(); }
-  }
+  // Every scene (including 'chase') uses the TTS robot voice; the chase no
+  // longer plays the recorded snd/chase.mp3 (file kept in the repo, just unused).
+  try{ const ss=window.speechSynthesis;
+    if(!ss){ done(); return; }
+    ss.cancel();
+    const u=new SpeechSynthesisUtterance(txt);
+    u.rate=1; u.pitch=1; u.onend=done; u.onerror=done;
+    ss.speak(u);
+  }catch{ done(); }
 }
 function cancelVoice(){
   try{ if(chaseAudio){ chaseAudio.pause(); chaseAudio.currentTime=0; } }catch{}

@@ -265,7 +265,8 @@
   /* =====================================================================
      AUDIO — all synthesized via Web Audio (no audio files).
      SFX: select / correct / wrong / timeout / transition / win.
-     Bed: a low drone + a tick that speeds up & rises in pitch as time runs low.
+     Music: an original cute, mellow chiptune loop (K.K.-Slider-ish) while a
+     question is shown — NO ticking countdown. Loops smoothly; stops on answer.
      Master mute toggle persisted in localStorage ('wuh_muted').
      ===================================================================== */
   const AudioFX = (() => {
@@ -313,55 +314,86 @@
     const win        = () => { arp([523.25, 659.25, 783.99, 1046.5, 1318.5], 0.11, 0.26, 'sine', 0.18);
                                chord([523.25, 783.99, 1046.5], 0.6, 'sine', 0.12, 0.55); };       // fanfare + chord
 
-    // --- background bed + countdown tick ---
-    let drone = null, droneGain = null, tickTimer = null, bedOn = false, getLeft = null;
+    // --- background MUSIC: original cute / mellow loop (replaces the countdown tick) ---
+    // 4-bar I–vi–IV–V loop (Cmaj7 · Am7 · Fmaj7 · G7) at 100 BPM (~9.6s), soft triangle
+    // lead over plucky square chord stabs and a gentle bouncing sine bass. Subtle volume
+    // so SFX cut through. A look-ahead scheduler queues iterations for a seamless loop.
+    let musicGain = null, loopTimer = null, bedOn = false, getLeft = null, nextLoopAt = 0;
+    const BPM = 100, BEAT = 60 / BPM, BAR = BEAT * 4, LOOP_DUR = BAR * 4;
+    const N = { C2:65.41, F2:87.31, G2:98.00, A2:110.00,
+                F3:174.61, G3:196.00, A3:220.00, B3:246.94,
+                C4:261.63, D4:293.66, E4:329.63, F4:349.23, G4:392.00, A4:440.00, B4:493.88,
+                C5:523.25, D5:587.33, E5:659.25, F5:698.46, G5:783.99, A5:880.00 };
+    // Original bouncy lead line across the 4 bars: [noteName | null(rest), durationInBeats]
+    const MELODY = [
+      ['E5',0.5],['G5',0.5],['E5',0.5],['C5',0.5],['D5',1],[null,1],
+      ['C5',0.5],['E5',0.5],['A5',0.5],['E5',0.5],['D5',1],['C5',1],
+      ['A4',0.5],['C5',0.5],['F5',0.5],['A5',0.5],['G5',1],['E5',1],
+      ['D5',0.5],['G5',0.5],['B4',0.5],['D5',0.5],['G5',1],[null,1]
+    ];
+    const CHORDS = [ ['C4','E4','G4','B4'], ['A3','C4','E4','G4'], ['F3','A3','C4','E4'], ['G3','B3','D4','F4'] ];
+    const BASS_ROOTS = ['C2','A2','F2','G2'];
+
+    function musicNote(t0, freq, dur, type, peak){
+      if(muted || !ctx || !musicGain) return;
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = type; o.frequency.setValueAtTime(freq, t0);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(peak, t0 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g); g.connect(musicGain);
+      o.start(t0); o.stop(t0 + dur + 0.05);
+    }
+    // Schedule one loop iteration starting at t0. rate<1 = a gentle tempo lift (final seconds).
+    function playIteration(t0, rate){
+      const beat = BEAT * rate, bar = beat * 4;
+      const leadPeak = rate < 1 ? 0.085 : 0.07;     // small brightening near the end
+      let tb = 0;
+      for(const m of MELODY){
+        const n = m[0], beats = m[1];
+        if(n) musicNote(t0 + tb*beat, N[n], beats*beat*0.95, 'triangle', leadPeak);
+        tb += beats;
+      }
+      for(let b = 0; b < 4; b++){
+        const barT = t0 + b*bar;
+        CHORDS[b].forEach(n => { [0,2].forEach(bt => musicNote(barT + bt*beat, N[n], beat*1.4, 'square', 0.022)); });
+        const root = N[BASS_ROOTS[b]];
+        musicNote(barT, root, beat*1.8, 'sine', 0.06);              // beat 1 root
+        musicNote(barT + 2*beat, root*2, beat*1.4, 'triangle', 0.05); // beat 3 octave bounce
+      }
+      return LOOP_DUR * rate;
+    }
+    function schedule(){
+      if(!bedOn || !ctx) return;
+      while(nextLoopAt < ctx.currentTime + 0.30){
+        const left = getLeft ? getLeft() : QUESTION_SECONDS;
+        const rate = left <= 5 ? 0.9 : 1.0;          // ~10% peppier in the last 5s (cute, not a tick)
+        nextLoopAt += playIteration(nextLoopAt, rate);
+      }
+      loopTimer = setTimeout(schedule, 120);
+    }
     function startBed(getLeftFn){
       stopBed();
       getLeft = getLeftFn; bedOn = true;
       if(!ensure()) return;
-      try{
-        drone = ctx.createOscillator(); droneGain = ctx.createGain();
-        drone.type = 'sine'; drone.frequency.value = 55;        // sub bass pad
-        droneGain.gain.value = muted ? 0 : 0.05;
-        drone.connect(droneGain); droneGain.connect(master);
-        drone.start();
-      }catch(e){}
-      scheduleTick();
-    }
-    function scheduleTick(){
-      if(!bedOn) return;
-      const left = getLeft ? getLeft() : QUESTION_SECONDS;
-      const frac = Math.max(0, Math.min(1, left / QUESTION_SECONDS));  // 1 = full time, 0 = out
-      // interval shrinks 560ms -> 130ms; pitch rises as time runs low
-      const interval = 130 + frac * 430;
-      if(!muted){
-        const t = ctx.currentTime;
-        const o = ctx.createOscillator(), g = ctx.createGain();
-        o.type = 'square';
-        o.frequency.value = 300 + (1 - frac) * 560;
-        const peak = 0.05 + (1 - frac) * 0.08;
-        g.gain.setValueAtTime(0.0001, t);
-        g.gain.exponentialRampToValueAtTime(peak, t + 0.005);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + 0.085);
-        o.connect(g); g.connect(master);
-        o.start(t); o.stop(t + 0.1);
-      }
-      tickTimer = setTimeout(scheduleTick, interval);
+      try{ musicGain = ctx.createGain(); musicGain.gain.value = 1; musicGain.connect(master); }catch(e){ musicGain = null; }
+      nextLoopAt = ctx.currentTime + 0.06;
+      schedule();
     }
     function stopBed(){
       bedOn = false;
-      if(tickTimer){ clearTimeout(tickTimer); tickTimer = null; }
-      if(drone){
-        try{ const t = ctx.currentTime; droneGain.gain.setTargetAtTime(0.0001, t, 0.04); drone.stop(t + 0.2); }catch(e){}
-        drone = null; droneGain = null;
-      }
+      if(loopTimer){ clearTimeout(loopTimer); loopTimer = null; }
+      if(musicGain && ctx){
+        const mg = musicGain; musicGain = null;
+        try{ mg.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.05); }catch(e){}   // quick clean fade-out
+        setTimeout(() => { try{ mg.disconnect(); }catch(e){} }, 500);
+      } else { musicGain = null; }
     }
 
     function setMuted(m){
       muted = m;
       try{ localStorage.setItem('wuh_muted', m ? '1' : '0'); }catch(e){}
       if(master) master.gain.value = m ? 0 : 0.9;
-      if(droneGain) droneGain.gain.value = m ? 0 : 0.05;
     }
 
     return { ensure, resume, isMuted: () => muted, setMuted,

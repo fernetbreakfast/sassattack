@@ -64,11 +64,49 @@
     <h1>SASS ATTACK</h1>
     <p class="sub">Choose your battle</p>
     <nav class="btns">
-      <a class="cta" href="/play/">NG</a>
-      <a class="cta alt" href="/old/">OG</a>
-      <a class="cta" href="/mem/">SM</a>
+      <a class="cta game-btn" href="/play/">NG</a>
+      <a class="cta alt game-btn" href="/old/">OG</a>
+      <a class="cta game-btn" href="/mem/">GYUH?</a>
     </nav>
     <p class="foot">&#129370; sassybreakfa.st</p>
   </main>
+  <script>
+  (() => {
+    'use strict';
+    // Play /sample.mp3 on game selection, then navigate once the clip ends.
+    // Page navigation stops audio, so we hold the link until the audio 'ended'
+    // event (or a fallback timeout) before following it. Audio is unlocked
+    // inside the tap gesture so mobile browsers allow playback.
+    const SAMPLE = '/sample.mp3';
+    const FALLBACK_MS = 2500;
+    let audio = null;
+    try { audio = new Audio(SAMPLE); audio.preload = 'auto'; } catch (e) { audio = null; }
+
+    document.querySelectorAll('a.game-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        const href = btn.getAttribute('href');
+        if (!href) return;
+        e.preventDefault();
+        let navigated = false;
+        const go = () => { if (navigated) return; navigated = true; window.location.href = href; };
+
+        // Always proceed after a fallback, even if audio never fires 'ended'.
+        const timer = setTimeout(go, FALLBACK_MS);
+
+        if (!audio) { clearTimeout(timer); go(); return; }
+        try {
+          audio.currentTime = 0;
+          audio.onended = () => { clearTimeout(timer); go(); };
+          const pr = audio.play();
+          if (pr && typeof pr.catch === 'function') {
+            pr.catch(() => { clearTimeout(timer); go(); }); // blocked/failed -> navigate now
+          }
+        } catch (err) {
+          clearTimeout(timer); go();
+        }
+      });
+    });
+  })();
+  </script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Sassmory — Sass Attack</title>
+<title>GYUH? — Sass Attack</title>
 <link rel="icon" type="image/png" href="/gfx/eggman_final.png" />
 <style>
   :root{
@@ -180,13 +180,27 @@
     padding:10px 18px; border-radius:12px; font-size:13px; opacity:0; pointer-events:none;
     transition:opacity .2s, transform .2s; z-index:30; max-width:90vw; text-align:center; }
   .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+  /* PIN gate (client-side only) */
+  .pinDots{ display:flex; gap:16px; justify-content:center; margin:18px 0 6px; }
+  .pinDot{ width:16px; height:16px; border-radius:50%; border:2px solid rgba(0,224,255,.4);
+    background:transparent; transition:.15s; }
+  .pinDot.on{ background:var(--neon); border-color:var(--neon); box-shadow:0 0 14px rgba(0,224,255,.6); }
+  .pinErr{ min-height:18px; margin:4px 0 10px; font-size:13px; font-weight:900; color:var(--hot); letter-spacing:.4px; }
+  .keypad{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:280px; margin:0 auto; }
+  .key{ -webkit-tap-highlight-color:transparent; cursor:pointer; padding:16px 0; border-radius:14px;
+    font-size:22px; font-weight:900; font-family:inherit; color:#fff;
+    border:1px solid rgba(0,224,255,.25); background:rgba(0,224,255,.06); transition:transform .06s, background .1s; }
+  .key:active{ transform:scale(.94); background:rgba(0,224,255,.2); }
+  .key.blank{ visibility:hidden; }
+  .card.shake{ animation:shake .35s ease; }
 </style>
 </head>
 <body>
   <a class="home-btn" href="/" aria-label="Home">&#127968;</a>
 
   <div class="hud">
-    <div class="hud-top"><span class="hud-title">SASSMORY</span></div>
+    <div class="hud-top"><span class="hud-title">GYUH?</span></div>
     <div class="hud-stats">
       <span>RND <b id="roundEl">0</b></span>
       <span id="modeTag">&#127859;</span>
@@ -206,7 +220,7 @@
   <!-- START / SETUP -->
   <div class="overlay show" id="start">
     <div class="card">
-      <h1>SASSMORY</h1>
+      <h1>GYUH?</h1>
       <p class="sub">A Simon-style photo memory duel. Pick a pic, watch the sass flash it back, then tap it in order. Miss once and the demon wins.</p>
 
       <div class="modes">
@@ -222,11 +236,11 @@
       <div class="privacy">&#128274; Your photo stays on your device &mdash; never uploaded.</div>
       <div class="thumbWrap"><img class="thumb" id="thumb" alt="your photo preview" /></div>
 
-      <button class="cta" id="startBtn" disabled>PICK A PHOTO FIRST</button>
+      <button class="cta" id="startBtn">PRESS START</button>
       <div class="row">
         <button class="cta alt" id="rulesBtn" style="font-size:14px;padding:10px 18px;">How to play</button>
       </div>
-      <p class="stats-line muted" style="margin-top:12px;font-size:11px;">No photo? Hit START anyway and we'll deal you a sassy default tileset.</p>
+      <p class="stats-line muted" style="margin-top:12px;font-size:11px;">No photo? Hit START and we'll deal you one of our sassy house pics.</p>
     </div>
   </div>
 
@@ -255,7 +269,7 @@
   <div class="overlay" id="scores">
     <div class="card">
       <h1 style="font-size:34px;">LEADERBOARD</h1>
-      <p class="sub">Top 10 Sassmory runs across all devices. Sign your run when you die to claim a spot &mdash; your entry glows gold.</p>
+      <p class="sub">Top 10 GYUH? runs across all devices. Sign your run when you die to claim a spot &mdash; your entry glows gold.</p>
       <ol class="scoreList" id="scoresList"><li class="muted">Loading&hellip;</li></ol>
       <button class="cta" id="scoresClose" style="margin-top:16px;">Close</button>
     </div>
@@ -292,6 +306,32 @@
         <button class="btn" id="hsRight">&#9654;</button>
       </div>
       <button class="cta" id="hsSaveBtn" style="margin-top:14px;">SAVE</button>
+    </div>
+  </div>
+
+  <!-- PIN GATE (client-side only) -->
+  <div class="overlay show" id="pinGate" style="z-index:40;">
+    <div class="card">
+      <h1 style="font-size:40px;">GYUH?</h1>
+      <p class="sub">Locked. Enter the 4-digit PIN to play.</p>
+      <div class="pinDots" id="pinDots">
+        <span class="pinDot"></span><span class="pinDot"></span><span class="pinDot"></span><span class="pinDot"></span>
+      </div>
+      <p class="pinErr" id="pinErr">&nbsp;</p>
+      <div class="keypad" id="keypad">
+        <button class="key" data-k="1">1</button>
+        <button class="key" data-k="2">2</button>
+        <button class="key" data-k="3">3</button>
+        <button class="key" data-k="4">4</button>
+        <button class="key" data-k="5">5</button>
+        <button class="key" data-k="6">6</button>
+        <button class="key" data-k="7">7</button>
+        <button class="key" data-k="8">8</button>
+        <button class="key" data-k="9">9</button>
+        <button class="key blank" disabled></button>
+        <button class="key" data-k="0">0</button>
+        <button class="key" data-k="del">&#9003;</button>
+      </div>
     </div>
   </div>
 
@@ -393,8 +433,13 @@
   let runId = '';
   let revealed = [];         // booleans: which tiles are permanently revealed
   let tileEls = [];          // tile DOM nodes
-  let imgEl = null;          // the chosen image (HTMLImageElement) or null -> default tileset
-  let imgReady = false;
+  let imgEl = null;          // the user-chosen image (HTMLImageElement); takes priority
+  let imgReady = false;      // true once the user has picked their own photo
+  let gameImg = null;        // the image actually sliced for the current game
+  // Bundled default photo rotation (used only when the player picks nothing).
+  const DEFAULT_SRCS = ['/mem/def/1.jpg','/mem/def/2.jpg','/mem/def/3.jpg','/mem/def/4.jpg','/mem/def/5.jpg'];
+  const defaultImgs = [];    // preloaded HTMLImageElements
+  let defaultRot = Math.floor(Math.random() * DEFAULT_SRCS.length); // rotation cursor
   let pendingScore = 0;
 
   /* ===== ELEMENTS ===== */
@@ -453,6 +498,23 @@
     reader.readAsDataURL(f);
   });
 
+  /* ===== DEFAULT PHOTO ROTATION (preloaded; used only if no user photo) ===== */
+  DEFAULT_SRCS.forEach(src => {
+    const im = new Image();
+    im.onload = () => { /* ready */ };
+    im.onerror = () => { /* ignore a missing default; pickDefault falls back */ };
+    im.src = src;
+    defaultImgs.push(im);
+  });
+  function pickDefault(){
+    // rotate through the ones that actually loaded; random start each session
+    const ready = defaultImgs.filter(im => im && im.complete && im.naturalWidth > 0);
+    if(!ready.length) return null;
+    const im = ready[defaultRot % ready.length];
+    defaultRot = (defaultRot + 1) % Math.max(1, ready.length);
+    return im;
+  }
+
   /* ===== BUILD GRID + SLICE PHOTO (canvas, on-device) ===== */
   function buildGrid(){
     N = MODE.n; total = N * N;
@@ -460,13 +522,16 @@
     gridEl.innerHTML = '';
     tileEls = []; revealed = new Array(total).fill(false);
 
-    const srcW = imgReady ? imgEl.naturalWidth  : 0;
-    const srcH = imgReady ? imgEl.naturalHeight : 0;
+    // gameImg is the user's photo if they picked one, else a rotated default.
+    const usable = gameImg && gameImg.complete && gameImg.naturalWidth > 0;
+    const srcW = usable ? gameImg.naturalWidth  : 0;
+    const srcH = usable ? gameImg.naturalHeight : 0;
     // cover-fit a square: take the largest centered square of the photo
     let side = 0, offX = 0, offY = 0;
-    if(imgReady){ side = Math.min(srcW, srcH); offX = (srcW - side)/2; offY = (srcH - side)/2; }
-    const cell = imgReady ? side / N : 0;
+    if(usable){ side = Math.min(srcW, srcH); offX = (srcW - side)/2; offY = (srcH - side)/2; }
+    const cell = usable ? side / N : 0;
 
+    // Last-resort colored tileset only if even the default failed to load.
     const DEFAULT_COLORS = ['#00e0ff','#ff3b6b','#ffd23f','#37ffb0','#a06bff','#ff8c42','#42d4ff','#ff5e9c','#9cff5e'];
 
     for(let i=0;i<total;i++){
@@ -476,8 +541,8 @@
       cv.width = 160; cv.height = 160;
       const cx = cv.getContext('2d');
       const r = Math.floor(i / N), c = i % N;
-      if(imgReady){
-        cx.drawImage(imgEl, offX + c*cell, offY + r*cell, cell, cell, 0, 0, 160, 160);
+      if(usable){
+        cx.drawImage(gameImg, offX + c*cell, offY + r*cell, cell, cell, 0, 0, 160, 160);
       } else {
         cx.fillStyle = DEFAULT_COLORS[i % DEFAULT_COLORS.length];
         cx.fillRect(0,0,160,160);
@@ -534,6 +599,8 @@
   function startGame(){
     ac(); // unlock audio on user gesture
     runId = Date.now().toString(36) + Math.random().toString(36).slice(2,10);
+    // User photo wins; otherwise rotate one of the bundled defaults.
+    gameImg = imgReady ? imgEl : pickDefault();
     buildGrid();
     sequence = []; round = 0; retriesLeft = MODE.retries;
     playing = true;
@@ -716,6 +783,41 @@
   $('scoresBtn').addEventListener('click', () => { scoresOv.classList.add('show'); renderTop($('scoresList')); });
   $('scoresClose').addEventListener('click', () => scoresOv.classList.remove('show'));
   $('restart').addEventListener('click', () => { goOv.classList.remove('show'); startOv.classList.add('show'); });
+
+  /* ===== PIN GATE (client-side only) =====
+     NOTE: This is NOT real security. This is a static site, so the PIN and the
+     check both live in the page source where anyone can read them. The gate
+     only keeps casual visitors out; never put anything sensitive behind it. */
+  (function pinGate(){
+    const PIN = '1025';
+    const PIN_KEY = 'gyuh_unlocked_v1';   // remembered per-device so we don't re-prompt
+    const gate = $('pinGate');
+    if(!gate) return;
+    if(store.get(PIN_KEY) === '1'){ gate.classList.remove('show'); return; }
+    const dotsWrap = $('pinDots'), errEl = $('pinErr'), card = gate.querySelector('.card');
+    let entry = '';
+    function renderDots(){
+      const dots = dotsWrap.querySelectorAll('.pinDot');
+      dots.forEach((d,i) => d.classList.toggle('on', i < entry.length));
+    }
+    function unlock(){ store.set(PIN_KEY, '1'); gate.classList.remove('show'); }
+    function reject(){
+      errEl.textContent = 'Nope. Try again.';
+      card.classList.add('shake');
+      setTimeout(() => card.classList.remove('shake'), 360);
+      entry = ''; renderDots();
+    }
+    $('keypad').addEventListener('click', e => {
+      const btn = e.target.closest('.key'); if(!btn) return;
+      const k = btn.dataset.k;
+      if(k === 'del'){ entry = entry.slice(0,-1); errEl.textContent = '\u00a0'; renderDots(); return; }
+      if(!k || entry.length >= 4) return;
+      entry += k; errEl.textContent = '\u00a0'; renderDots();
+      if(entry.length === 4){
+        setTimeout(() => { if(entry === PIN){ unlock(); } else { reject(); } }, 140);
+      }
+    });
+  })();
 
   // initial sync
   syncHigh();

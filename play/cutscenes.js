@@ -263,7 +263,7 @@ const SCENES=[
     if(t<6100) E('❤️',0.62,lerp(0.92,0.84,hk),0.55,Math.min(1,hk*2));
     else E('💨',0.66,0.85,0.6,1-seg(t,6100,6700));
   }
-  if(t>4600) caption('no retaliation.', seg(t,4600,5100));
+  if(t>4600) caption("oh, she wet", seg(t,4600,5100));
 }},
 {id:'discobreak',music:'disco',e:'🪩',title:'Disco Break',note:'mid-run · 7s',dur:7000,draw(t){
   stars(t);

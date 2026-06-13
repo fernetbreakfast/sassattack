@@ -6,6 +6,7 @@ window.SassCutscenes=(function(){
 let ctx=null,W=0,H=0,FS=40;
 const CHAR_SCALE=1.65;   // bigger cutscene characters (+65%)
 const TIME_SCALE=1.5;    // slower pacing / longer scenes (+50%)
+let voiceOn=true, spokeCaption=false, chaseAudio=null;   // spoken-caption voice
 let acGet=null;
 function bind(c,w,h,f){ ctx=c; W=w; H=h; FS=f; }
 function setAudio(fn){ acGet=fn; }
@@ -36,6 +37,7 @@ function wrapText(txt,maxW){
   if(line)lines.push(line); return lines.length?lines:[''];
 }
 function caption(txt,alpha=1){
+  if(!spokeCaption){ spokeCaption=true; speak(String(txt)); }
   ctx.save(); ctx.globalAlpha=alpha; ctx.textAlign='center';
   const fs=Math.max(16,FS*0.54);
   ctx.font=`900 ${fs}px Trebuchet MS,sans-serif`;
@@ -448,10 +450,49 @@ const SCENES=[
 
 const BYID={}; SCENES.forEach(s=>{ if(!s.grp) BYID[s.id]=s; });
 let current=null;
+/* ---------- spoken captions ---------- */
+function getChaseAudio(){ if(!chaseAudio){ chaseAudio=new Audio('snd/chase.mp3'); chaseAudio.preload='auto'; } return chaseAudio; }
+function duckMusic(on){
+  try{ if(musicGain){ const A=ac(); const g=musicGain.gain;
+    if(A){ g.cancelScheduledValues(A.currentTime); g.linearRampToValueAtTime(on?0.22:1.0,A.currentTime+0.08); }
+    else g.value=on?0.22:1.0;
+  } }catch{}
+}
+function speak(txt){
+  if(!voiceOn||!txt) return;
+  duckMusic(true);
+  const done=()=>duckMusic(false);
+  if(current&&current.id==='chase'){
+    try{ const a=getChaseAudio(); a.muted=false; a.currentTime=0; a.onended=done; a.onerror=done;
+      const pr=a.play(); if(pr&&pr.catch)pr.catch(done);
+    }catch{ done(); }
+  } else {
+    try{ const ss=window.speechSynthesis;
+      if(!ss){ done(); return; }
+      ss.cancel();
+      const u=new SpeechSynthesisUtterance(txt);
+      u.rate=1; u.pitch=1; u.onend=done; u.onerror=done;
+      ss.speak(u);
+    }catch{ done(); }
+  }
+}
+function cancelVoice(){
+  try{ if(chaseAudio){ chaseAudio.pause(); chaseAudio.currentTime=0; } }catch{}
+  try{ if(window.speechSynthesis) window.speechSynthesis.cancel(); }catch{}
+  duckMusic(false);
+}
+function setVoice(on){ voiceOn=!!on; if(!voiceOn) cancelVoice(); }
+function unlockVoice(){   // prime audio + speech inside the start-tap gesture (iOS/Android)
+  try{ const a=getChaseAudio(); a.muted=true; const pr=a.play();
+    if(pr&&pr.then) pr.then(()=>{ a.pause(); a.currentTime=0; a.muted=false; }).catch(()=>{ a.muted=false; });
+    else { try{a.pause();}catch{} a.muted=false; }
+  }catch{}
+  try{ const ss=window.speechSynthesis; if(ss){ const u=new SpeechSynthesisUtterance(' '); u.volume=0; ss.speak(u); ss.cancel(); } }catch{}
+}
 function has(id){ return !!BYID[id]; }
 function dur(id){ return BYID[id]?BYID[id].dur*TIME_SCALE:0; }
-function start(id){ current=BYID[id]||null; if(current) startMusic(current.music,current.dur*TIME_SCALE,current.musicStop!=null?current.musicStop*TIME_SCALE:current.musicStop); return current?current.dur*TIME_SCALE:0; }
+function start(id){ current=BYID[id]||null; spokeCaption=false; if(current) startMusic(current.music,current.dur*TIME_SCALE,current.musicStop!=null?current.musicStop*TIME_SCALE:current.musicStop); return current?current.dur*TIME_SCALE:0; }
 function draw(t){ if(current&&ctx) current.draw(t/TIME_SCALE); }
-function stop(){ stopMusic(); current=null; }
-return {bind,setAudio,has,dur,start,draw,stop};
+function stop(){ cancelVoice(); stopMusic(); current=null; spokeCaption=false; }
+return {bind,setAudio,has,dur,start,draw,stop,setVoice,unlockVoice};
 })();

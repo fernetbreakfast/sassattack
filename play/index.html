@@ -33,6 +33,12 @@
     backdrop-filter:blur(8px); z-index:5;
   }
   .hud-top{ display:flex; align-items:center; gap:12px; }
+  .voice-btn{ position:fixed; top:8px; left:8px; z-index:6;
+    width:38px; height:34px; display:grid; place-items:center; cursor:pointer;
+    border-radius:10px; font-size:16px; line-height:1;
+    border:1px solid rgba(0,224,255,.3); background:rgba(10,14,34,.55);
+    color:#fff; backdrop-filter:blur(8px); -webkit-tap-highlight-color:transparent; }
+  .voice-btn:active{ transform:scale(.92); }
   .hud-chip{
     -webkit-tap-highlight-color:transparent; cursor:pointer;
     width:34px; height:30px; display:grid; place-items:center;
@@ -201,6 +207,7 @@
 </style>
 </head>
 <body>
+  <button id="voiceBtn" class="voice-btn" aria-label="Toggle voice">🔊</button>
   <div class="hud">
     <div class="hud-top">
       <button class="hud-chip" id="rulesBtn">📖</button>
@@ -851,10 +858,22 @@
   }
   function startGame(){
     if(started)return; started=true; ac();
+    if(window.SassCutscenes){ SassCutscenes.setVoice(voiceOn); SassCutscenes.unlockVoice(); }
     rulesOv.classList.remove('show'); scoresOv.classList.remove('show'); startOv.classList.remove('show');
     resetGame(); running=true; requestAnimationFrame(loop);
   }
   startBtn.addEventListener('click',startGame);
+  /* ----- spoken-caption voice toggle (persisted) ----- */
+  const voiceBtn=$('voiceBtn');
+  let voiceOn=store.get('sass_voice')!=='0';   // default ON
+  function updateVoiceBtn(){ if(voiceBtn) voiceBtn.textContent = voiceOn ? '🔊' : '🔇'; }
+  if(window.SassCutscenes) SassCutscenes.setVoice(voiceOn);
+  updateVoiceBtn();
+  if(voiceBtn) voiceBtn.addEventListener('click',()=>{
+    voiceOn=!voiceOn; store.set('sass_voice', voiceOn?'1':'0'); updateVoiceBtn();
+    if(window.SassCutscenes) SassCutscenes.setVoice(voiceOn);
+  });
+
 
   async function maybePostLeaderboard(s){
     if(!(await qualifies(s)))return false;

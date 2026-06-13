@@ -644,10 +644,10 @@
 
   /* ===== Leaderboard / HS (server) ===== */
   async function fetchTop(board){ try{
-    const url=SCORES_ENDPOINT+(board==='daily'?'?board=daily':'');
+    const url=SCORES_ENDPOINT+'?game=new'+(board==='daily'?'&board=daily':'');
     const r=await fetchT(url); if(!r.ok)return[]; const d=await r.json(); return Array.isArray(d.top)?d.top:[]; }catch{return[];} }
   async function postTop(s,initials){ try{ const h={'Content-Type':'application/json'}; if(SCORE_TOKEN)h['X-Score-Token']=SCORE_TOKEN;
-    await fetchT(SCORES_ENDPOINT,{method:'POST',headers:h,body:JSON.stringify({score:Math.round(s),initials:(initials||'').slice(0,3),run_id:runId,mode:modeKey})}); }catch{} }
+    await fetchT(SCORES_ENDPOINT,{method:'POST',headers:h,body:JSON.stringify({score:Math.round(s),initials:(initials||'').slice(0,3),run_id:runId,mode:modeKey,game:'new'})}); }catch{} }
   async function renderTop(target=scoresList, highlight=null, board='all'){
     const top=await fetchTop(board); target.innerHTML='';
     if(!top.length){ const li=document.createElement('li'); li.className='muted'; li.textContent='No scores yet. Be the first!'; target.appendChild(li); return; }
@@ -667,8 +667,8 @@
   }
   async function qualifies(s){ const top=await fetchTop('all'); if(top.length<10)return true; const min=Math.min(...top.map(x=>Number(x.score)||0)); return Math.round(s)>min; }
   async function postHighScore(s){ try{ const h={'Content-Type':'application/json'}; if(SCORE_TOKEN)h['X-Score-Token']=SCORE_TOKEN;
-    await fetchT(SCORE_ENDPOINT,{method:'POST',headers:h,body:JSON.stringify({score:Math.round(s),initials:highName||''})}); }catch{} }
-  async function syncHigh(){ try{ const r=await fetchT(SCORE_ENDPOINT); if(!r.ok)return; const d=await r.json();
+    await fetchT(SCORE_ENDPOINT,{method:'POST',headers:h,body:JSON.stringify({score:Math.round(s),initials:highName||'',game:'new'})}); }catch{} }
+  async function syncHigh(){ try{ const r=await fetchT(SCORE_ENDPOINT+'?game=new'); if(!r.ok)return; const d=await r.json();
     if(d&&typeof d.score==='number'){ highScore=Number(d.score)||0; store.set(HS_KEY,String(highScore));
       if(typeof d.initials==='string'&&d.initials.trim()&&d.initials.trim()!=='---'){ highName=d.initials.toUpperCase().slice(0,3); store.set(HS_NAME_KEY,highName); }
       highEl.textContent=fmt.format(highScore); highLabel.textContent=highName||'HIG'; } }catch{} }

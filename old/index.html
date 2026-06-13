@@ -360,13 +360,13 @@
 
   /* ===== Leaderboard (server) ===== */
   async function fetchTop5(){
-    try{ const r=await fetch(SCORES_ENDPOINT,{method:'GET'}); if(!r.ok) return []; const d=await r.json(); return Array.isArray(d.top)?d.top.slice(0,5):[]; }catch{return [];}
+    try{ const r=await fetch(SCORES_ENDPOINT+'?game=old',{method:'GET'}); if(!r.ok) return []; const d=await r.json(); return Array.isArray(d.top)?d.top.slice(0,5):[]; }catch{return [];}
   }
   async function postTop5(theScore, initials){
     try{
       const headers={'Content-Type':'application/json'};
       if (SCORE_TOKEN) headers['X-Score-Token']=SCORE_TOKEN;
-      await fetch(SCORES_ENDPOINT,{method:'POST',headers,body:JSON.stringify({score:Math.round(theScore),initials:(initials||'').slice(0,3)})});
+      await fetch(SCORES_ENDPOINT,{method:'POST',headers,body:JSON.stringify({score:Math.round(theScore),initials:(initials||'').slice(0,3),game:'old'})});
     }catch{}
   }
   async function renderTop5(){
@@ -396,12 +396,12 @@
     try{
       const headers={'Content-Type':'application/json'};
       if (SCORE_TOKEN) headers['X-Score-Token']=SCORE_TOKEN;
-      await fetch(SCORE_ENDPOINT,{method:'POST',headers,body:JSON.stringify({score:Math.round(score),initials:highName||''})});
+      await fetch(SCORE_ENDPOINT,{method:'POST',headers,body:JSON.stringify({score:Math.round(score),initials:highName||'',game:'old'})});
     }catch{}
   }
   async function fetchAndSyncHighScore(){
     try{
-      const r=await fetch(SCORE_ENDPOINT,{method:'GET'});
+      const r=await fetch(SCORE_ENDPOINT+'?game=old',{method:'GET'});
       if(!r.ok) return;
       const d=await r.json();
       if(d && typeof d.score==='number'){

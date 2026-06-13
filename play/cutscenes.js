@@ -4,8 +4,8 @@
 window.SassCutscenes=(function(){
 'use strict';
 let ctx=null,W=0,H=0,FS=40;
-const CHAR_SCALE=1.38;   // bigger cutscene characters (+38%)
-const TIME_SCALE=1.25;   // slower pacing / longer scenes (+25%)
+const CHAR_SCALE=1.65;   // bigger cutscene characters (+65%)
+const TIME_SCALE=1.5;    // slower pacing / longer scenes (+50%)
 let acGet=null;
 function bind(c,w,h,f){ ctx=c; W=w; H=h; FS=f; }
 function setAudio(fn){ acGet=fn; }
@@ -20,24 +20,38 @@ const seg=(t,t0,t1)=>ease(clamp01((t-t0)/(t1-t0)));
 // E: draw emoji at fractional coords
 function E(e,fx,fy,scale=1,alpha=1,rot=0){
   ctx.save(); ctx.globalAlpha=alpha;
+  const eff=FS*scale*CHAR_SCALE;
+  const m=(eff*0.5+4)/H;                       // keep big glyphs fully on-frame vertically
+  fy=Math.max(m,Math.min(1-m,fy));             // (horizontal slides via fx are intentional)
   ctx.translate(fx*W,fy*H); if(rot)ctx.rotate(rot);
   ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.font=`bold ${FS*scale*CHAR_SCALE}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+  ctx.font=`bold ${eff}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
   ctx.fillText(e,0,0); ctx.restore();
 }
 const bob=(t,amp=0.008,spd=0.012)=>Math.sin(t*spd)*amp; // walk bounce
+function wrapText(txt,maxW){
+  const words=String(txt).split(' '); const lines=[]; let line='';
+  for(const wd of words){ const test=line?line+' '+wd:wd;
+    if(ctx.measureText(test).width>maxW && line){ lines.push(line); line=wd; } else line=test; }
+  if(line)lines.push(line); return lines.length?lines:[''];
+}
 function caption(txt,alpha=1){
   ctx.save(); ctx.globalAlpha=alpha; ctx.textAlign='center';
-  ctx.font=`900 ${Math.max(13,FS*0.42)}px Trebuchet MS,sans-serif`;
+  const fs=Math.max(16,FS*0.54);
+  ctx.font=`900 ${fs}px Trebuchet MS,sans-serif`;
   ctx.fillStyle='rgba(255,210,63,.95)';
   ctx.shadowColor='rgba(0,0,0,.8)'; ctx.shadowBlur=8;
-  ctx.fillText(txt, W/2, H*0.93); ctx.restore();
+  const lines=wrapText(txt,W*0.9), lh=fs*1.25, baseY=H*0.93-(lines.length-1)*lh;
+  for(let i=0;i<lines.length;i++) ctx.fillText(lines[i], W/2, baseY+i*lh);
+  ctx.restore();
 }
 function bubble(fx,fy,txt,alpha=1){
   ctx.save(); ctx.globalAlpha=alpha;
-  ctx.font=`bold ${FS*0.8}px "Apple Color Emoji","Segoe UI Emoji",sans-serif`;
-  const w=ctx.measureText(txt).width+FS*0.7, h=FS*1.25;
-  const x=fx*W, y=fy*H;
+  ctx.font=`bold ${FS*1.0}px "Apple Color Emoji","Segoe UI Emoji",sans-serif`;
+  let w=ctx.measureText(txt).width+FS*0.7; const h=FS*1.25;
+  w=Math.min(w,W*0.92);                        // never wider than the screen
+  let x=fx*W; const y=fy*H;
+  x=Math.max(w/2,Math.min(W-w/2,x));           // keep the bubble fully on-frame
   ctx.fillStyle='rgba(255,255,255,.94)';
   ctx.beginPath();
   if(ctx.roundRect) ctx.roundRect(x-w/2,y-h/2,w,h,h*0.4);

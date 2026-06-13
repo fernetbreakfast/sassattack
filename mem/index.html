@@ -485,7 +485,7 @@
   let runId = '';
   let revealed = [];         // booleans: which tiles are permanently revealed
   let tileEls = [];          // tile DOM nodes
-  let cornerBuf = [];        // rolling buffer of the last 8 tile presses (cheat detect)
+  let cheatProg = 0;         // how many consecutive cheat-pattern taps matched so far
   let cheatTimer = null;     // timer for the timed "solution" peek
   let imgEl = null;          // the user-chosen image (HTMLImageElement); takes priority
   let imgReady = false;      // true once the user has picked their own photo
@@ -743,7 +743,7 @@
     sequence = []; round = 0;
     cleared = 0; score = 0;
     livesLeft = MODE.lives; triviaUsed = false; pendingBadTile = null;
-    cornerBuf = []; if(cheatTimer){ clearTimeout(cheatTimer); cheatTimer = null; }
+    cheatProg = 0; if(cheatTimer){ clearTimeout(cheatTimer); cheatTimer = null; }
     gridEl.classList.remove('solution');
     renderLives(); renderScore();
     playing = true;
@@ -753,6 +753,7 @@
 
   function nextRound(){
     round++;
+    cheatProg = 0;                 // each round starts a fresh cheat-entry window
     roundEl.textContent = String(round);
     sequence.push(Math.floor(Math.random() * total));
     applyReveals();
@@ -768,12 +769,6 @@
     const TL = 0, TR = N - 1, BR = N * N - 1, BL = N * (N - 1);
     return [TL, TL, TR, TR, BR, BR, BL, BL];
   }
-  function cheatMatches(){
-    if(cornerBuf.length < 8) return false;
-    const p = cheatPattern();
-    for(let k = 0; k < 8; k++){ if(cornerBuf[k] !== p[k]) return false; }
-    return true;
-  }
   function fireCheat(){
     gridEl.classList.add('solution');           // every tile canvas -> full opacity
     setCaption('CHEAT: solution revealed \uD83D\uDC41', 'good');
@@ -786,16 +781,36 @@
   }
 
   function onTileTap(i){
-    // CHEAT DETECT (runs before the guess logic and regardless of input phase,
-    // so it never registers as a wrong/right guess — the cheat takes precedence).
-    // Pattern: each CORNER tile twice, CLOCKWISE from top-left:
-    // TL,TL, TR,TR, BR,BR, BL,BL. Requires >= 3 rounds (squares) solved.
-    cornerBuf.push(i); if(cornerBuf.length > 8) cornerBuf.shift();
-    if(playing && cleared >= 3 && cheatMatches()){
-      cornerBuf = [];        // consume the pattern
-      fireCheat();
-      return;                // this tap is NOT counted as a guess
+    // ===== CORNER CHEAT (life-safe) =====
+    // Pattern: each corner twice, clockwise from top-left: TL,TL,TR,TR,BR,BR,BL,BL.
+    // Arms after cleared>=3. It is entered during the SAFE WINDOW — the sequence
+    // flash/playback and the between-rounds pause (acceptingInput === false) — where
+    // taps drive ONLY the cheat: they never count as guesses, cost a life, or disturb
+    // the playback. A cheat begun in the safe window may also finish after input opens,
+    // so a tap that lands a moment late still costs nothing. Fresh taps during your own
+    // input turn are left as normal guesses, so real play is never hijacked.
+    if(playing && cleared >= 3){
+      const pat = cheatPattern();
+      if(!acceptingInput){
+        // SAFE WINDOW (flash / between-rounds pause): taps only advance the cheat.
+        if(i === pat[cheatProg]) cheatProg++;
+        else cheatProg = (i === pat[0]) ? 1 : 0;   // wrong corner resets (or restarts on TL)
+        if(cheatProg >= pat.length){ cheatProg = 0; fireCheat(); }
+        return;                                     // never a guess in the safe window
+      } else if(cheatProg > 0){
+        // Continue a cheat started in the safe window, across into the input turn.
+        if(i === pat[cheatProg]){
+          cheatProg++;
+          if(cheatProg >= pat.length){ cheatProg = 0; fireCheat(); }
+          return;                                   // consumed as cheat progress; not a guess
+        }
+        cheatProg = 0;                              // broke the pattern -> resume normal play
+      }
+    } else {
+      cheatProg = 0;
     }
+
+    // ===== normal guess logic (input turn only) =====
     if(!acceptingInput || !playing) return;
     const expected = sequence[inputIdx];
     if(i === expected){

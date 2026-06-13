@@ -357,11 +357,27 @@
     }
   }
 
-  /* ===== SFX (trimmed) ===== */
+  /* ===== SFX (all synthesized via Web Audio, no files) ===== */
   let AC=null; const audioOn=true;
-  function ac(){ if(!audioOn)return null; if(!AC){ const C=window.AudioContext||window.webkitAudioContext; if(!C)return null; AC=new C(); } if(AC.state==='suspended') AC.resume(); return AC; }
-  function env(a=0.005,d=0.1,total=0.18){ const A=ac(); if(!A)return null; const g=A.createGain(),t=A.currentTime; g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.9,t+a); g.gain.linearRampToValueAtTime(0.0001,t+total+d); g.connect(A.destination); return {A,g,t}; }
-  function sfxShoot(){ const e=env(0.002,0.08,0.12); if(!e)return; const o=e.A.createOscillator(); o.type='triangle'; o.frequency.setValueAtTime(900,e.t); o.connect(e.g); o.start(e.t); o.stop(e.t+0.12); }
+  // Create the context lazily and (re)resume it; everything is wrapped so audio never throws.
+  function ac(){ try{ if(!audioOn) return null; if(!AC){ const C=window.AudioContext||window.webkitAudioContext; if(!C) return null; AC=new C(); } if(AC.state!=='running') AC.resume(); return AC; }catch(e){ return null; } }
+  // Tonal envelope (kept from before; now takes a peak so levels can be balanced).
+  function env(a=0.005,d=0.1,total=0.18,peak=0.9){ const A=ac(); if(!A)return null; const g=A.createGain(),t=A.currentTime; g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(peak,t+a); g.gain.linearRampToValueAtTime(0.0001,t+total+d); g.connect(A.destination); return {A,g,t}; }
+  // Quick tone with optional pitch slide; peak controls loudness.
+  function blip(freq,dur,type,peak,slideTo){ try{ const A=ac(); if(!A)return; const t=A.currentTime; const o=A.createOscillator(),g=A.createGain(); o.type=type||'triangle'; o.frequency.setValueAtTime(freq,t); if(slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(1,slideTo),t+dur); g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(peak||0.4,t+0.008); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); o.connect(g); g.connect(A.destination); o.start(t); o.stop(t+dur+0.03); }catch(e){} }
+  // Short decaying noise burst (explosions/impacts), optional lowpass for body.
+  function noise(dur,peak,lp){ try{ const A=ac(); if(!A)return; const t=A.currentTime; const n=Math.max(1,(A.sampleRate*dur)|0); const buf=A.createBuffer(1,n,A.sampleRate); const d=buf.getChannelData(0); for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*(1-i/n); const src=A.createBufferSource(); src.buffer=buf; const g=A.createGain(); g.gain.setValueAtTime(peak||0.4,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur); let node=src; if(lp){ const f=A.createBiquadFilter(); f.type='lowpass'; f.frequency.value=lp; src.connect(f); node=f; } node.connect(g); g.connect(A.destination); src.start(t); src.stop(t+dur+0.02); }catch(e){} }
+
+  // The sounds. Levels balanced: shoot is quietest (it fires constantly); explosions/death louder but capped.
+  function sfxShoot(){ const e=env(0.001,0.05,0.08,0.28); if(!e)return; const o=e.A.createOscillator(); o.type='square'; o.frequency.setValueAtTime(1150,e.t); o.frequency.exponentialRampToValueAtTime(300,e.t+0.09); o.connect(e.g); o.start(e.t); o.stop(e.t+0.12); }  // punchy pitch-down zap
+  function sfxExplode(){ noise(0.22,0.42,2200); blip(170,0.20,'sine',0.5,55); }     // noise burst + low thump
+  function sfxBossHit(){ noise(0.10,0.36,1100); blip(150,0.09,'square',0.4,90); }    // chunkier, shorter impact
+  function sfxHurt(){ blip(430,0.24,'sawtooth',0.5,120); }                           // distinct descending "ow"
+  function sfxDeath(){ blip(440,0.18,'triangle',0.5,330); setTimeout(()=>blip(294,0.30,'sawtooth',0.55,140),150); noise(0.42,0.22,500); }  // short defeat
+  function sfxWave(){ blip(523,0.12,'square',0.34); setTimeout(()=>blip(659,0.12,'square',0.34),90); setTimeout(()=>blip(784,0.16,'square',0.40),180); }  // rising "cleared!"
+
+  // Reliable audio: create/resume the context on the first (and every) user gesture, never throws.
+  ['pointerdown','touchstart','keydown','click'].forEach(ev => { try{ document.addEventListener(ev, ()=>{ try{ ac(); }catch(e){} }, {passive:true}); }catch(e){} });
 
   /* ===== Leaderboard (server) ===== */
   async function fetchTop5(){
@@ -552,6 +568,7 @@
   }
 
   function gameOverScreen(){
+    sfxDeath();
     running=false;
     finalScore.textContent = fmt.format(Math.round(score));
     (async ()=>{
@@ -666,7 +683,7 @@
         for(let j=0;j<invaders.length;j++){
           const inv=invaders[j]; if(!inv.alive) continue;
           if((sh.x-inv.x)**2 + (sh.y-inv.y)**2 <= (fontSize*0.9)**2){
-            inv.alive=false; shots.splice(i,1); addScore(6900); removed=true; break;
+            inv.alive=false; shots.splice(i,1); addScore(6900); sfxExplode(); removed=true; break;
           }
         }
         if(removed) continue;
@@ -679,7 +696,7 @@
             const b=bosses[bi];
             if((sh.x-b.x)**2 + (sh.y-b.y)**2 <= (fontSize*1.5)**2){
               shots.splice(i,1); removed=true; b.hp--;
-              if(b.hp<=0){ addScore(690000); bosses.splice(bi,1); }
+              if(b.hp<=0){ addScore(690000); bosses.splice(bi,1); sfxExplode(); } else { sfxBossHit(); }
               break;
             }
           }
@@ -690,13 +707,13 @@
       for(let i=bossShots.length-1;i>=0;i--){
         const bs=bossShots[i]; bs.y += bs.vy * dt;
         if(Math.hypot(bs.x-player.x,bs.y-player.y) < fontSize*0.6){
-          bossShots.splice(i,1); lives--; livesEl.textContent=String(lives); if(lives<=0){gameOverScreen();return;} continue;
+          bossShots.splice(i,1); lives--; livesEl.textContent=String(lives); if(lives<=0){gameOverScreen();return;} sfxHurt(); continue;
         }
         if(bs.y > H + fontSize) bossShots.splice(i,1);
       }
       // wave clear
       const invAlive=invaders.some(v=>v.alive);
-      if(!invAlive && bosses.length===0){ addScore(100000); wave++; waveEl.textContent=String(wave); newWave(wave); }
+      if(!invAlive && bosses.length===0){ addScore(100000); wave++; waveEl.textContent=String(wave); newWave(wave); sfxWave(); }
     }
     /* Wave 3: two bosses + 🥒/🍗 (H2O scoring on kill) */
     else if (wave===3){
@@ -709,7 +726,7 @@
       for(let i=bossShots.length-1;i>=0;i--){
         const bs=bossShots[i]; bs.y+=bs.vy*dt;
         if(Math.hypot(bs.x-player.x,bs.y-player.y)<fontSize*0.6){
-          bossShots.splice(i,1); lives--; livesEl.textContent=String(lives); if(lives<=0){gameOverScreen();return;} continue;
+          bossShots.splice(i,1); lives--; livesEl.textContent=String(lives); if(lives<=0){gameOverScreen();return;} sfxHurt(); continue;
         }
         if(bs.type==='drum'){ for(let k=shots.length-1;k>=0;k--){ const sh=shots[k]; if((sh.x-bs.x)**2+(sh.y-bs.y)**2 <= (fontSize*0.9)**2){ shots.splice(k,1); bossShots.splice(i,1); break; } } }
         if(bs.y>H+fontSize) bossShots.splice(i,1);
@@ -726,13 +743,14 @@
             if (b.hp <= 0) {
               addScore(690000);     // PAYOUT on kill
               bosses.splice(bi, 1);
-            }
+              sfxExplode();
+            } else { sfxBossHit(); }
             break;
           }
         }
         if (removed) continue;
       }
-      if(bosses.length===0){ addScore(100000); wave++; waveEl.textContent=String(wave); newWave(wave); }
+      if(bosses.length===0){ addScore(100000); wave++; waveEl.textContent=String(wave); newWave(wave); sfxWave(); }
     }
     /* Wave 4: Mirror Match */
     else if (wave===4){
@@ -759,6 +777,7 @@
         if(Math.hypot(ms.x - player.x, ms.y - player.y) < fontSize*0.6){
           mirrorShots.splice(i,1); lives--; livesEl.textContent=String(lives);
           if(lives<=0){ gameOverScreen(); return; }
+          sfxHurt();
           continue;
         }
         if(ms.y > H + fontSize) mirrorShots.splice(i,1);
@@ -775,7 +794,8 @@
             addScore(100000); // wave clear bonus
             wave++; waveEl.textContent=String(wave);
             newWave(wave);
-          }
+            sfxExplode(); sfxWave();
+          } else { sfxBossHit(); }
         }
       }
     }

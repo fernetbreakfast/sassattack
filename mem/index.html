@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Sassmory — Sass Attack</title>
+<link rel="icon" type="image/png" href="/gfx/eggman_final.png" />
+<style>
+  :root{
+    color-scheme: dark;
+    --neon:#00e0ff; --hot:#ff3b6b; --gold:#ffd23f; --grn:#37ffb0;
+    --bg0:#05060f; --bg1:#0a0e22;
+  }
+  *{ box-sizing:border-box; }
+  html,body{
+    margin:0; height:100%;
+    background:
+      radial-gradient(1400px 900px at 50% 18%, #141a3a 0%, var(--bg1) 42%, var(--bg0) 100%);
+    color:#fff;
+    font-family:"Trebuchet MS","Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+    -webkit-user-select:none; user-select:none;
+    -webkit-touch-callout:none;
+  }
+  body{ min-height:100%; display:flex; flex-direction:column; }
+
+  /* HUD */
+  .hud{
+    position:sticky; top:0; z-index:5;
+    display:flex; flex-direction:column; align-items:center; gap:4px;
+    margin:max(8px,env(safe-area-inset-top)) auto 0; padding:8px 16px; border-radius:18px;
+    width:min(94vw,520px);
+    background:rgba(10,14,34,.55); border:1px solid rgba(0,224,255,.35);
+    box-shadow:0 0 24px rgba(0,224,255,.15), inset 0 0 18px rgba(0,224,255,.06);
+    backdrop-filter:blur(8px);
+  }
+  .hud-top{ display:flex; align-items:center; gap:12px; }
+  .hud-title{
+    font-size:clamp(16px,5vw,22px); line-height:1; font-weight:900; letter-spacing:.5px;
+    background:linear-gradient(90deg,var(--neon),var(--hot),var(--gold));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    text-shadow:0 0 18px rgba(255,59,107,.25);
+  }
+  .hud-stats{ display:flex; gap:14px; align-items:center; font-size:clamp(12px,3.6vw,15px); font-variant-numeric:tabular-nums; }
+  .hud-stats b{ color:var(--gold); }
+  .home-btn{ position:fixed; top:max(8px,env(safe-area-inset-top)); left:8px; z-index:6;
+    width:38px; height:34px; display:grid; place-items:center; cursor:pointer; text-decoration:none;
+    border-radius:10px; font-size:16px; line-height:1;
+    border:1px solid rgba(0,224,255,.3); background:rgba(10,14,34,.55);
+    color:#fff; backdrop-filter:blur(8px); -webkit-tap-highlight-color:transparent; }
+  .home-btn:active{ transform:scale(.92); }
+
+  /* Stage */
+  .stage{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    width:100%; padding:16px 14px max(20px,env(safe-area-inset-bottom)); gap:14px; }
+  .caption{ min-height:22px; font-size:clamp(14px,4.2vw,17px); font-weight:900; letter-spacing:.4px;
+    text-align:center; color:#c6cdf2; max-width:min(94vw,520px); }
+  .caption.hot{ color:var(--hot); animation:pop .3s ease; }
+  .caption.good{ color:var(--grn); }
+  @keyframes pop{0%{transform:scale(1.25)}100%{transform:scale(1)}}
+
+  /* Grid */
+  .grid{
+    display:grid; gap:6px; width:min(94vw,520px); aspect-ratio:1/1;
+    padding:8px; border-radius:18px;
+    background:rgba(10,14,34,.5); border:1px solid rgba(0,224,255,.25);
+    box-shadow:0 18px 60px rgba(0,0,0,.55), inset 0 0 30px rgba(0,224,255,.05);
+    touch-action:manipulation;
+  }
+  .tile{
+    position:relative; border-radius:12px; overflow:hidden; cursor:pointer;
+    border:1px solid rgba(0,224,255,.22);
+    background:rgba(0,224,255,.05);
+    -webkit-tap-highlight-color:transparent;
+    transition:transform .06s, box-shadow .12s, filter .12s;
+  }
+  .tile canvas{ position:absolute; inset:0; width:100%; height:100%; display:block;
+    opacity:0; transition:opacity .18s; image-rendering:auto; }
+  /* permanently revealed tiles stay visible */
+  .tile.revealed canvas{ opacity:.34; }
+  /* a tile lit during the sequence or correct tap shows full slice + glow */
+  .tile.flash canvas{ opacity:1; }
+  .tile.flash{ box-shadow:0 0 26px rgba(0,224,255,.8), inset 0 0 22px rgba(0,224,255,.25);
+    border-color:var(--neon); transform:scale(.97); filter:saturate(1.3) brightness(1.15); }
+  .tile.wrong{ box-shadow:0 0 26px rgba(255,59,107,.8); border-color:var(--hot);
+    animation:shake .3s ease; }
+  @keyframes shake{ 0%,100%{transform:translateX(0)} 25%{transform:translateX(-5px)} 75%{transform:translateX(5px)} }
+  .grid.locked .tile{ cursor:default; }
+  .tile .dot{ position:absolute; inset:0; margin:auto; width:18%; height:18%; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #fff, var(--neon) 70%); opacity:.5; transition:opacity .15s; }
+  .tile.revealed .dot, .tile.flash .dot{ opacity:0; }
+
+  /* Overlays */
+  .overlay{
+    position:fixed; inset:0; display:none; place-items:center; z-index:10;
+    background:radial-gradient(900px 600px at 50% 40%, rgba(10,14,34,.78), rgba(5,6,15,.94));
+    backdrop-filter:blur(4px); padding:18px;
+  }
+  .overlay.show{ display:grid; }
+  .card{
+    width:min(92vw,460px); padding:26px 24px; border-radius:22px; text-align:center;
+    background:linear-gradient(180deg, rgba(20,26,58,.95), rgba(10,14,34,.95));
+    border:1px solid rgba(0,224,255,.4);
+    box-shadow:0 24px 80px rgba(0,0,0,.7), inset 0 0 40px rgba(0,224,255,.06);
+    max-height:92vh; overflow-y:auto;
+  }
+  .card h1{
+    margin:0 0 6px; font-size:clamp(30px,9vw,46px); font-weight:900; letter-spacing:1px;
+    background:linear-gradient(90deg,var(--neon),var(--hot),var(--gold));
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+  }
+  .card .sub{ color:#aeb6e0; margin:0 0 18px; font-size:14px; line-height:1.5; }
+  .cta{
+    display:inline-block; margin-top:6px; padding:14px 30px; border-radius:14px;
+    font-size:18px; font-weight:900; letter-spacing:.5px; cursor:pointer; border:none;
+    color:#05060f; background:linear-gradient(90deg,var(--neon),var(--grn));
+    box-shadow:0 8px 30px rgba(0,224,255,.4); transition:transform .08s;
+    font-family:inherit; text-decoration:none;
+  }
+  .cta:active{ transform:translateY(2px) scale(.98); }
+  .cta.alt{ background:linear-gradient(90deg,var(--hot),var(--gold)); color:#1a0008; box-shadow:0 8px 30px rgba(255,59,107,.4); }
+  .cta:disabled{ opacity:.45; cursor:default; }
+  .row{ display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:14px; }
+  .muted{ color:#8b93c0; }
+
+  /* file input */
+  .pick{ position:relative; display:inline-block; margin:4px 0 10px; }
+  .pick input[type=file]{ position:absolute; inset:0; opacity:0; width:100%; height:100%; cursor:pointer; }
+  .privacy{ font-size:12px; color:var(--grn); margin:8px 0 4px; letter-spacing:.3px; }
+  .thumbWrap{ display:flex; justify-content:center; margin:10px 0; }
+  .thumb{ width:120px; height:120px; border-radius:14px; object-fit:cover;
+    border:1px solid rgba(0,224,255,.4); box-shadow:0 0 22px rgba(0,224,255,.25); display:none; }
+  .thumb.show{ display:block; }
+
+  /* mode select */
+  .modes{ display:flex; gap:8px; justify-content:center; margin:6px 0 12px; flex-wrap:wrap; }
+  .mode{ -webkit-tap-highlight-color:transparent; cursor:pointer; flex:1; min-width:106px;
+    padding:10px 8px; border-radius:14px; border:1px solid rgba(0,224,255,.25);
+    background:rgba(0,224,255,.06); color:#fff; transition:transform .06s; font-family:inherit; }
+  .mode:active{ transform:scale(.96); }
+  .mode .me1{ font-size:22px; line-height:1.1; }
+  .mode .me2{ font-size:11px; font-weight:900; letter-spacing:1px; margin-top:3px; color:#aeb6e0; }
+  .mode .me3{ font-size:10px; color:#8b93c0; margin-top:2px; }
+  .mode.sel{ border-color:var(--gold); background:rgba(255,210,63,.12);
+    box-shadow:0 0 18px rgba(255,210,63,.35); }
+  .mode.sel .me2{ color:var(--gold); }
+
+  /* scores */
+  .scoreList{ list-style:none; padding:0; margin:14px 0 0; text-align:left; }
+  .scoreList li{ display:flex; justify-content:space-between; padding:8px 12px; border-radius:10px; font-variant-numeric:tabular-nums; }
+  .scoreList li:nth-child(odd){ background:rgba(255,255,255,.04); }
+  .scoreList li b{ color:var(--gold); }
+  .rank{ color:var(--neon); font-weight:900; }
+  .modeBadge{ margin-right:5px; }
+  .scoreList li.me{ background:rgba(255,210,63,.16)!important; border:1px solid var(--gold);
+    border-radius:8px; animation:pop .3s ease; }
+  .scoreList li.me .rank{ color:var(--gold); }
+  .lb-head{ font-size:13px; font-weight:900; letter-spacing:1px; color:var(--neon); margin:14px 0 0; }
+
+  /* initials */
+  .slots{ display:flex; gap:14px; justify-content:center; margin:14px 0; }
+  .slot{ width:54px; height:64px; display:grid; place-items:center; font-size:34px; font-weight:900;
+    border-radius:12px; background:rgba(0,224,255,.08); border:2px solid rgba(0,224,255,.25); }
+  .slot.active{ border-color:var(--hot); box-shadow:0 0 22px rgba(255,59,107,.5); }
+  .nav{ display:flex; gap:10px; justify-content:center; margin-top:10px; }
+  .btn{ -webkit-tap-highlight-color:transparent; cursor:pointer; padding:10px 16px;
+    border-radius:11px; font-size:18px; font-weight:900; border:1px solid rgba(0,224,255,.3);
+    background:rgba(0,224,255,.08); color:#fff; font-family:inherit; }
+  .btn:active{ transform:scale(.92); background:rgba(0,224,255,.22); }
+
+  .rule-sec{ text-align:left; margin:0 0 14px; padding:10px 12px; border-radius:12px;
+    background:rgba(0,224,255,.05); border:1px solid rgba(0,224,255,.14); }
+  .rule-sec h3{ margin:0 0 6px; font-size:14px; letter-spacing:1px; color:var(--neon); }
+  .rule-sec p{ margin:0 0 6px; font-size:13px; color:#c6cdf2; line-height:1.6; }
+  .rule-sec p:last-child{ margin-bottom:0; }
+  .stats-line{ margin-top:10px; font-size:11px; color:#8b93c0; letter-spacing:.5px; }
+
+  .toast{
+    position:fixed; left:50%; bottom:24px; transform:translateX(-50%) translateY(20px);
+    background:rgba(10,14,34,.92); border:1px solid rgba(255,59,107,.5); color:#fff;
+    padding:10px 18px; border-radius:12px; font-size:13px; opacity:0; pointer-events:none;
+    transition:opacity .2s, transform .2s; z-index:30; max-width:90vw; text-align:center; }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+  <a class="home-btn" href="/" aria-label="Home">&#127968;</a>
+
+  <div class="hud">
+    <div class="hud-top"><span class="hud-title">SASSMORY</span></div>
+    <div class="hud-stats">
+      <span>RND <b id="roundEl">0</b></span>
+      <span id="modeTag">&#127859;</span>
+      <span>BEST <b id="bestEl">0</b></span>
+      <span>HI <b id="hiEl">0</b></span>
+    </div>
+  </div>
+
+  <main class="stage">
+    <div class="caption" id="caption">Tap START to face the sass.</div>
+    <div class="grid locked" id="grid"></div>
+    <div class="row">
+      <button class="cta alt" id="scoresBtn" style="font-size:14px;padding:10px 18px;">&#127942; Leaderboard</button>
+    </div>
+  </main>
+
+  <!-- START / SETUP -->
+  <div class="overlay show" id="start">
+    <div class="card">
+      <h1>SASSMORY</h1>
+      <p class="sub">A Simon-style photo memory duel. Pick a pic, watch the sass flash it back, then tap it in order. Miss once and the demon wins.</p>
+
+      <div class="modes">
+        <button class="mode" data-mode="easy"><div class="me1">&#127859;</div><div class="me2">EASY</div><div class="me3">3&#215;3 &middot; slow &middot; 1 retry</div></button>
+        <button class="mode" data-mode="mid"><div class="me1">&#127798;</div><div class="me2">MIDDLE</div><div class="me3">4&#215;4 &middot; brisk &middot; no retry</div></button>
+        <button class="mode" data-mode="hard"><div class="me1">&#128128;</div><div class="me2">HARD</div><div class="me3">5&#215;5 &middot; fast &middot; no retry</div></button>
+      </div>
+
+      <div class="pick">
+        <button class="cta alt" id="pickLabel" type="button">&#128247; Choose a photo</button>
+        <input type="file" id="photo" accept="image/*" />
+      </div>
+      <div class="privacy">&#128274; Your photo stays on your device &mdash; never uploaded.</div>
+      <div class="thumbWrap"><img class="thumb" id="thumb" alt="your photo preview" /></div>
+
+      <button class="cta" id="startBtn" disabled>PICK A PHOTO FIRST</button>
+      <div class="row">
+        <button class="cta alt" id="rulesBtn" style="font-size:14px;padding:10px 18px;">How to play</button>
+      </div>
+      <p class="stats-line muted" style="margin-top:12px;font-size:11px;">No photo? Hit START anyway and we'll deal you a sassy default tileset.</p>
+    </div>
+  </div>
+
+  <!-- RULES -->
+  <div class="overlay" id="rules">
+    <div class="card">
+      <h1 style="font-size:32px;">HOW TO PLAY</h1>
+      <div class="rule-sec">
+        <h3>THE LOOP</h3>
+        <p>Each round the demon flashes a sequence of tiles &mdash; lighting up a slice of your photo with a tone. Tap them back in the <b>exact same order</b>.</p>
+        <p>Survive and the sequence grows by one each round. Every round you clear, one more tile of the picture stays revealed &mdash; finish the puzzle by going deep.</p>
+      </div>
+      <div class="rule-sec">
+        <h3>SCORING</h3>
+        <p>Your score is the highest sequence length you reproduce. One wrong tap and it's over (easy gives you a single retry).</p>
+      </div>
+      <div class="rule-sec">
+        <h3>PRIVACY</h3>
+        <p>Your photo is sliced up <b>entirely on your phone</b> with canvas. Nothing is uploaded &mdash; only your score and initials ever leave the device.</p>
+      </div>
+      <button class="cta" id="rulesClose">Got it</button>
+    </div>
+  </div>
+
+  <!-- SCORES -->
+  <div class="overlay" id="scores">
+    <div class="card">
+      <h1 style="font-size:34px;">LEADERBOARD</h1>
+      <p class="sub">Top 10 Sassmory runs across all devices. Sign your run when you die to claim a spot &mdash; your entry glows gold.</p>
+      <ol class="scoreList" id="scoresList"><li class="muted">Loading&hellip;</li></ol>
+      <button class="cta" id="scoresClose" style="margin-top:16px;">Close</button>
+    </div>
+  </div>
+
+  <!-- GAME OVER -->
+  <div class="overlay" id="gameOver">
+    <div class="card">
+      <h1 id="goTitle" style="font-size:38px;">GAME OVER</h1>
+      <p class="sub" id="goMsg">The demon remembers better than you.</p>
+      <p style="font-size:15px;margin:6px 0;">Reached round <b id="goScore" style="color:var(--gold);">0</b></p>
+      <div class="lb-head">TOP 10</div>
+      <ol class="scoreList" id="goScores"><li class="muted">Loading&hellip;</li></ol>
+      <div class="row">
+        <button class="cta" id="restart" style="margin-top:6px;">RUN IT BACK</button>
+        <a class="cta alt" href="/" style="margin-top:6px;">&#127968; HOME</a>
+      </div>
+      <div class="row"><button class="cta alt" id="editInitials" style="font-size:13px;padding:9px 16px;background:rgba(0,224,255,.12);color:#fff;box-shadow:none;border:1px solid rgba(0,224,255,.3);">&#9999;&#65039; Edit initials</button></div>
+    </div>
+  </div>
+
+  <!-- INITIALS -->
+  <div class="overlay" id="hsModal">
+    <div class="card">
+      <h1 style="font-size:28px;">SIGN YOUR RUN</h1>
+      <p class="sub">Enter your initials</p>
+      <div class="slots">
+        <div class="slot" id="hsS0">A</div><div class="slot" id="hsS1">A</div><div class="slot" id="hsS2">A</div>
+      </div>
+      <div class="nav">
+        <button class="btn" id="hsLeft">&#9664;</button>
+        <button class="btn" id="hsUp">&#9650;</button>
+        <button class="btn" id="hsDown">&#9660;</button>
+        <button class="btn" id="hsRight">&#9654;</button>
+      </div>
+      <button class="cta" id="hsSaveBtn" style="margin-top:14px;">SAVE</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  /* ===== CONFIG ===== */
+  const SCORE_ENDPOINT  = 'https://api.sassybreakfa.st/log/hscore.php';
+  const SCORES_ENDPOINT = 'https://api.sassybreakfa.st/log/leaderboard.php';
+  const SCORE_TOKEN     = 'thesasshastheass';
+  const GAME            = 'memory';
+
+  // fetch with a short timeout so a missing backend never hangs the game
+  function fetchT(url, opts = {}, ms = 3500){
+    const c = new AbortController();
+    const t = setTimeout(() => c.abort(), ms);
+    return fetch(url, {...opts, signal: c.signal}).finally(() => clearTimeout(t));
+  }
+
+  const store = {
+    get(k){ try{ return localStorage.getItem(k); }catch{ return null; } },
+    set(k,v){ try{ localStorage.setItem(k,v); }catch{} }
+  };
+
+  const BEST_KEY = 'sassmory_best_v1', NAME_KEY = 'sassmory_initials';
+
+  const $ = id => document.getElementById(id);
+
+  // Surface unexpected errors on screen (phones have no console).
+  window.addEventListener('error', e => {
+    try{ const t = $('toast');
+      t.textContent = '⚠ ' + String(e.message || 'script error').slice(0,60);
+      t.classList.add('show'); setTimeout(()=>t.classList.remove('show'), 4000);
+    }catch{}
+  });
+
+  /* ===== MODES ===== */
+  const MODES = {
+    easy: { e:'🍳', name:'EASY',   n:3, flashOn:620, flashGap:300, retries:1 },
+    mid:  { e:'🌶', name:'MIDDLE', n:4, flashOn:460, flashGap:200, retries:0 },
+    hard: { e:'💀', name:'HARD',   n:5, flashOn:330, flashGap:130, retries:0 }
+  };
+  let modeKey = store.get('sassmory_mode') || 'easy';
+  if(!MODES[modeKey]) modeKey = 'easy';
+  let MODE = MODES[modeKey];
+
+  /* ===== AUDIO (Web Audio, synthesized per-tile tones) ===== */
+  let AC = null;
+  function ac(){ if(!AC){ const C = window.AudioContext || window.webkitAudioContext; if(!C) return null; AC = new C(); } if(AC.state==='suspended') AC.resume(); return AC; }
+  function blip(freq, type='triangle', dur=0.18, vol=0.5){
+    const A = ac(); if(!A) return;
+    const o = A.createOscillator(), g = A.createGain(), t = A.currentTime;
+    o.type = type; o.frequency.setValueAtTime(freq, t);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+    o.connect(g); g.connect(A.destination); o.start(t); o.stop(t+dur);
+  }
+  // pentatonic-ish base, each tile gets a stable pitch from its index
+  const SCALE = [261.63,293.66,329.63,392.00,440.00,523.25,587.33,659.25,783.99];
+  function tileFreq(i){ const base = SCALE[i % SCALE.length]; const oct = Math.floor(i / SCALE.length); return base * Math.pow(2, oct); }
+  const sfxWin  = () => { blip(523,'triangle',0.12,0.45); setTimeout(()=>blip(784,'triangle',0.16,0.4),110); };
+  const sfxFail = () => { blip(160,'sawtooth',0.4,0.55); blip(90,'square',0.5,0.4); };
+
+  /* ===== TAUNTS ===== */
+  const TAUNTS_FAIL = [
+    "The demon remembers better than you.",
+    "Sequence broken. So is your spirit.",
+    "Wrong tile, sweet summer child.",
+    "That's not how the picture goes, genius.",
+    "The chick is laughing at you.",
+    "Memory of a goldfish, ego of a god.",
+    "Tragic. Truly. Go again."
+  ];
+  const TAUNTS_WIN_ROUND = [
+    "Round cleared. Don't get cocky.",
+    "Another slice unlocked. Greedy.",
+    "Deeper into the sass you go.",
+    "The picture's coming together. Unlike your life.",
+    "Survived. For now."
+  ];
+  const pickOne = a => a[Math.floor(Math.random()*a.length)];
+
+  /* ===== STATE ===== */
+  let N = 3;                 // grid side
+  let total = 9;             // tiles
+  let sequence = [];         // order of tile indices
+  let inputIdx = 0;          // player progress in current sequence
+  let round = 0;             // current round = sequence length
+  let best = parseInt(store.get(BEST_KEY) || '0', 10) || 0;
+  let highScore = 0;
+  let highName = (store.get(NAME_KEY) || '').toUpperCase().slice(0,3);
+  let acceptingInput = false;
+  let playing = false;
+  let retriesLeft = 0;
+  let runId = '';
+  let revealed = [];         // booleans: which tiles are permanently revealed
+  let tileEls = [];          // tile DOM nodes
+  let imgEl = null;          // the chosen image (HTMLImageElement) or null -> default tileset
+  let imgReady = false;
+  let pendingScore = 0;
+
+  /* ===== ELEMENTS ===== */
+  const gridEl   = $('grid');
+  const captionEl= $('caption');
+  const roundEl  = $('roundEl');
+  const bestEl   = $('bestEl');
+  const hiEl     = $('hiEl');
+  const modeTag  = $('modeTag');
+
+  const startOv  = $('start');
+  const startBtn = $('startBtn');
+  const photoInp = $('photo');
+  const pickLabel= $('pickLabel');
+  const thumb    = $('thumb');
+  const rulesOv  = $('rules');
+  const scoresOv = $('scores');
+  const goOv     = $('gameOver');
+  const hsOv     = $('hsModal');
+
+  bestEl.textContent = String(best);
+  modeTag.textContent = MODE.e;
+
+  function toast(msg){ const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
+  function setCaption(msg, cls){ captionEl.className = 'caption' + (cls ? ' ' + cls : ''); captionEl.textContent = msg; }
+
+  /* ===== MODE SELECT ===== */
+  const modeBtns = [...document.querySelectorAll('.mode')];
+  function applyMode(k){
+    modeKey = k; MODE = MODES[k];
+    modeTag.textContent = MODE.e;
+    modeBtns.forEach(b => b.classList.toggle('sel', b.dataset.mode === k));
+    store.set('sassmory_mode', k);
+  }
+  modeBtns.forEach(b => b.addEventListener('click', () => applyMode(b.dataset.mode)));
+  applyMode(modeKey);
+
+  /* ===== PHOTO LOADING (fully client-side, never uploaded) ===== */
+  pickLabel.addEventListener('click', () => photoInp.click());
+  photoInp.addEventListener('change', () => {
+    const f = photoInp.files && photoInp.files[0];
+    if(!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        imgEl = img; imgReady = true;
+        thumb.src = img.src; thumb.classList.add('show');
+        startBtn.disabled = false; startBtn.textContent = 'PRESS START';
+        pickLabel.textContent = '📷 Change photo';
+      };
+      img.onerror = () => toast('Could not read that image');
+      img.src = reader.result;
+    };
+    reader.onerror = () => toast('Could not read that file');
+    reader.readAsDataURL(f);
+  });
+
+  /* ===== BUILD GRID + SLICE PHOTO (canvas, on-device) ===== */
+  function buildGrid(){
+    N = MODE.n; total = N * N;
+    gridEl.style.gridTemplateColumns = 'repeat(' + N + ', 1fr)';
+    gridEl.innerHTML = '';
+    tileEls = []; revealed = new Array(total).fill(false);
+
+    const srcW = imgReady ? imgEl.naturalWidth  : 0;
+    const srcH = imgReady ? imgEl.naturalHeight : 0;
+    // cover-fit a square: take the largest centered square of the photo
+    let side = 0, offX = 0, offY = 0;
+    if(imgReady){ side = Math.min(srcW, srcH); offX = (srcW - side)/2; offY = (srcH - side)/2; }
+    const cell = imgReady ? side / N : 0;
+
+    const DEFAULT_COLORS = ['#00e0ff','#ff3b6b','#ffd23f','#37ffb0','#a06bff','#ff8c42','#42d4ff','#ff5e9c','#9cff5e'];
+
+    for(let i=0;i<total;i++){
+      const tile = document.createElement('div');
+      tile.className = 'tile'; tile.dataset.idx = String(i);
+      const cv = document.createElement('canvas');
+      cv.width = 160; cv.height = 160;
+      const cx = cv.getContext('2d');
+      const r = Math.floor(i / N), c = i % N;
+      if(imgReady){
+        cx.drawImage(imgEl, offX + c*cell, offY + r*cell, cell, cell, 0, 0, 160, 160);
+      } else {
+        cx.fillStyle = DEFAULT_COLORS[i % DEFAULT_COLORS.length];
+        cx.fillRect(0,0,160,160);
+        cx.fillStyle = 'rgba(5,6,15,.85)';
+        cx.font = '900 70px Trebuchet MS, sans-serif';
+        cx.textAlign = 'center'; cx.textBaseline = 'middle';
+        cx.fillText(String(i+1), 80, 88);
+      }
+      const dot = document.createElement('div'); dot.className = 'dot';
+      tile.appendChild(cv); tile.appendChild(dot);
+      tile.addEventListener('click', () => onTileTap(i));
+      gridEl.appendChild(tile);
+      tileEls.push(tile);
+    }
+  }
+
+  /* ===== FLASH / REVEAL ===== */
+  function flashTile(i, dur){
+    return new Promise(res => {
+      const tile = tileEls[i];
+      tile.classList.add('flash');
+      blip(tileFreq(i), 'triangle', Math.max(0.12, dur/1000 * 0.7), 0.5);
+      setTimeout(() => {
+        tile.classList.remove('flash');
+        setTimeout(res, MODE.flashGap);
+      }, dur);
+    });
+  }
+
+  async function playSequence(){
+    acceptingInput = false;
+    gridEl.classList.add('locked');
+    setCaption('Watch closely…');
+    await sleep(450);
+    for(const i of sequence){
+      await flashTile(i, MODE.flashOn);
+    }
+    acceptingInput = true; inputIdx = 0;
+    gridEl.classList.remove('locked');
+    setCaption('Your turn — tap it back.');
+  }
+
+  function applyReveals(){
+    // reveal the unique tiles that have appeared so far, one per cleared round
+    const seen = [];
+    for(const i of sequence){ if(seen.indexOf(i) === -1) seen.push(i); }
+    const k = Math.min(round - 1, total); // rounds cleared so far
+    revealed = new Array(total).fill(false);
+    for(let j=0;j<k && j<seen.length;j++){ revealed[seen[j]] = true; }
+    tileEls.forEach((t,i) => t.classList.toggle('revealed', revealed[i]));
+  }
+
+  /* ===== ROUND FLOW ===== */
+  function startGame(){
+    ac(); // unlock audio on user gesture
+    runId = Date.now().toString(36) + Math.random().toString(36).slice(2,10);
+    buildGrid();
+    sequence = []; round = 0; retriesLeft = MODE.retries;
+    playing = true;
+    startOv.classList.remove('show');
+    nextRound();
+  }
+
+  function nextRound(){
+    round++;
+    roundEl.textContent = String(round);
+    sequence.push(Math.floor(Math.random() * total));
+    applyReveals();
+    if(round > 1){ setCaption(pickOne(TAUNTS_WIN_ROUND), 'good'); }
+    setTimeout(() => playSequence(), round > 1 ? 700 : 200);
+  }
+
+  function onTileTap(i){
+    if(!acceptingInput || !playing) return;
+    const expected = sequence[inputIdx];
+    if(i === expected){
+      const tile = tileEls[i];
+      tile.classList.add('flash');
+      blip(tileFreq(i), 'triangle', 0.16, 0.5);
+      setTimeout(() => tile.classList.remove('flash'), 180);
+      inputIdx++;
+      if(inputIdx >= sequence.length){
+        acceptingInput = false;
+        sfxWin();
+        if(round > best){ best = round; store.set(BEST_KEY, String(best)); bestEl.textContent = String(best); }
+        nextRound();
+      }
+    } else {
+      if(retriesLeft > 0){
+        retriesLeft--;
+        const tile = tileEls[i]; tile.classList.add('wrong');
+        setTimeout(() => tile.classList.remove('wrong'), 320);
+        sfxFail();
+        setCaption('Wrong! One retry — watch again.', 'hot');
+        acceptingInput = false;
+        setTimeout(() => playSequence(), 900);
+      } else {
+        gameOver(i);
+      }
+    }
+  }
+
+  function gameOver(badTile){
+    playing = false; acceptingInput = false;
+    if(badTile != null && tileEls[badTile]){
+      const t = tileEls[badTile]; t.classList.add('wrong');
+      setTimeout(() => t.classList.remove('wrong'), 400);
+    }
+    sfxFail();
+    gridEl.classList.add('locked');
+    finishRun(round); // score = sequence length attempted when you failed
+  }
+
+  async function finishRun(score){
+    $('goScore').textContent = String(score);
+    $('goTitle').textContent = 'GAME OVER';
+    $('goMsg').textContent = pickOne(TAUNTS_FAIL);
+    if(score > best){ best = score; store.set(BEST_KEY, String(best)); bestEl.textContent = String(best); }
+    goOv.classList.add('show');
+    renderTop($('goScores'));
+    postHighScore(score);
+    if(await qualifies(score)){
+      pendingScore = score;
+      setTimeout(() => openInitials(), 400);
+    }
+  }
+
+  /* ===== INITIALS ENTRY ===== */
+  let hsLetters = ['A','A','A'];
+  let hsPos = 0;
+  const slotEls = [$('hsS0'), $('hsS1'), $('hsS2')];
+  function renderSlots(){
+    slotEls.forEach((s,i) => { s.textContent = hsLetters[i]; s.classList.toggle('active', i === hsPos); });
+  }
+  function openInitials(){
+    const seed = (highName || 'AAA').padEnd(3,'A');
+    hsLetters = [seed[0], seed[1], seed[2]]; hsPos = 0;
+    renderSlots(); hsOv.classList.add('show');
+  }
+  function cycle(d){
+    const c = hsLetters[hsPos].charCodeAt(0) - 65;
+    const n = ((c + d) % 26 + 26) % 26;
+    hsLetters[hsPos] = String.fromCharCode(65 + n);
+    renderSlots();
+  }
+  $('hsLeft').addEventListener('click', () => { hsPos = (hsPos+2)%3; renderSlots(); });
+  $('hsRight').addEventListener('click', () => { hsPos = (hsPos+1)%3; renderSlots(); });
+  $('hsUp').addEventListener('click', () => cycle(1));
+  $('hsDown').addEventListener('click', () => cycle(-1));
+  $('hsSaveBtn').addEventListener('click', () => {
+    highName = hsLetters.join('');
+    store.set(NAME_KEY, highName);
+    hsOv.classList.remove('show');
+    postTop(pendingScore, highName);
+    postHighScore(pendingScore);
+    setTimeout(() => renderTop($('goScores'), { score: pendingScore, initials: highName }), 350);
+    toast('Run signed: ' + highName);
+  });
+  $('editInitials').addEventListener('click', openInitials);
+
+  /* ===== LEADERBOARD / HIGH SCORE (server) ===== */
+  async function fetchTop(){
+    try{
+      const r = await fetchT(SCORES_ENDPOINT + '?game=' + GAME);
+      if(!r.ok) return [];
+      const d = await r.json();
+      return Array.isArray(d.top) ? d.top : [];
+    }catch{ return []; }
+  }
+  async function postTop(s, initials){
+    try{
+      const h = { 'Content-Type':'application/json' };
+      if(SCORE_TOKEN) h['X-Score-Token'] = SCORE_TOKEN;
+      await fetchT(SCORES_ENDPOINT, { method:'POST', headers:h, body: JSON.stringify({
+        score: Math.round(s), initials: (initials||'').slice(0,3), run_id: runId, mode: modeKey, game: GAME
+      }) });
+    }catch{}
+  }
+  async function qualifies(s){
+    const top = await fetchTop();
+    if(top.length < 10) return true;
+    const min = Math.min.apply(null, top.map(x => Number(x.score) || 0));
+    return Math.round(s) > min;
+  }
+  async function postHighScore(s){
+    try{
+      const h = { 'Content-Type':'application/json' };
+      if(SCORE_TOKEN) h['X-Score-Token'] = SCORE_TOKEN;
+      await fetchT(SCORE_ENDPOINT, { method:'POST', headers:h, body: JSON.stringify({
+        score: Math.round(s), initials: highName || '', game: GAME
+      }) });
+    }catch{}
+  }
+  async function syncHigh(){
+    try{
+      const r = await fetchT(SCORE_ENDPOINT + '?game=' + GAME);
+      if(!r.ok) return;
+      const d = await r.json();
+      if(d && typeof d.score === 'number'){
+        highScore = Number(d.score) || 0;
+        hiEl.textContent = String(highScore);
+        if(typeof d.initials === 'string' && d.initials.trim() && d.initials.trim() !== '---'){
+          if(!highName){ highName = d.initials.toUpperCase().slice(0,3); store.set(NAME_KEY, highName); }
+        }
+      }
+    }catch{}
+  }
+  const MODE_EMOJI = { easy:'🍳', mid:'🌶', hard:'💀' };
+  async function renderTop(target, highlight){
+    const top = await fetchTop();
+    target.innerHTML = '';
+    if(!top.length){ const li=document.createElement('li'); li.className='muted'; li.textContent='No scores yet. Be the first!'; target.appendChild(li); return; }
+    let marked = false;
+    top.slice(0,10).forEach((row,i) => {
+      const li = document.createElement('li');
+      const ini = (row.initials || '---').toUpperCase().slice(0,3);
+      const mE = MODE_EMOJI[row.mode] || '';
+      const a = document.createElement('span');
+      a.innerHTML = '<span class="rank">' + (i+1) + '.</span> <span class="modeBadge">' + mE + '</span>' + ini;
+      const b = document.createElement('b'); b.textContent = row.score || 0;
+      li.append(a,b);
+      if(highlight && !marked && Math.round(row.score) === Math.round(highlight.score) && ini === (highlight.initials||'---').toUpperCase().slice(0,3)){
+        li.classList.add('me'); marked = true;
+      }
+      target.appendChild(li);
+    });
+  }
+
+  /* ===== UTIL ===== */
+  function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+
+  /* ===== UI WIRING ===== */
+  startBtn.addEventListener('click', startGame);
+  $('rulesBtn').addEventListener('click', () => rulesOv.classList.add('show'));
+  $('rulesClose').addEventListener('click', () => rulesOv.classList.remove('show'));
+  $('scoresBtn').addEventListener('click', () => { scoresOv.classList.add('show'); renderTop($('scoresList')); });
+  $('scoresClose').addEventListener('click', () => scoresOv.classList.remove('show'));
+  $('restart').addEventListener('click', () => { goOv.classList.remove('show'); startOv.classList.add('show'); });
+
+  // initial sync
+  syncHigh();
+})();
+</script>
+</body>
+</html>

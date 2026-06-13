@@ -301,7 +301,7 @@ const SCENES=[
   E('🐣', 0.15, 0.16, 1.1); // watching the entire crossing
   // pointedly not making eye contact
   if(t>2500&&t<3400) bubble(0.15,0.05,'👀',seg(t,2500,2800)*(1-seg(t,3100,3400)));
-  if(t>5000) caption('an unspoken truce.', seg(t,5000,5500));
+  if(t>5000) caption("breakfast in bed?", seg(t,5000,5500));
 }},
 {id:'inferno',music:'disco',musicStop:3000,e:'💥',title:'Disco Inferno',note:'deep waves · 7s',dur:7000,draw(t){
   stars(t);
@@ -333,7 +333,7 @@ const SCENES=[
     else { const k2=seg(t,6100,6500); E('🌭', lerp(0.60,0.52,k2), lerp(0.50,0.85,k2), 0.9, 1-k2, 8+k2*6); }
   }
   if(t>5900) E('🍗',0.62,0.50,1.2,1, t>6200?0.15:0); // the block, then a proud little tilt
-  if(t>6700) caption('some negotiations fail.', seg(t,6700,7200));
+  if(t>6700) caption("go piss, girl", seg(t,6700,7200));
 }},
 {grp:'THE LOVE ARC'},
 {id:'offering',music:'love',e:'🌭',title:'The Offering',note:'boss wave · 8s',dur:8000,draw(t){
@@ -358,7 +358,7 @@ const SCENES=[
     if(t>5800&&t<6500) bubble(0.42,0.68,'🤨',seg(t,5800,6100)*(1-seg(t,6300,6500)));
     hearts(t,6900,0.46,0.80,6,0.12);
   }
-  if(t>6900) caption('he waited.', seg(t,6900,7400));
+  if(t>6900) caption("I got sumthin fer ya", seg(t,6900,7400));
 }},
 {id:'madly',music:'love',e:'❤️',title:'Madly',note:'late run · 8s · the showpiece',dur:8000,draw(t){
   stars(t);
@@ -379,7 +379,7 @@ const SCENES=[
     E('🐣',0.2,0.82+hop,1.2);
   }
   flash(t,6000,180);
-  if(t>6600) caption("that's a yes.", seg(t,6600,7100));
+  if(t>6600) caption("yer butt. please, yer butt. puhleeaaase", seg(t,6600,7100));
 }},
 {grp:'FIXED SLOTS — the Mirror Match'},
 {id:'reflection',music:'tense',e:'🪞',title:'The Reflection',note:'always right before the Mirror · 7s',dur:7000,draw(t){

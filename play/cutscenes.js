@@ -244,7 +244,7 @@ const SCENES=[
     E('😈', 0.88, 0.18, 0.9, 0.8); // watching from the corner, confused
     if(k>0.3) bubble(0.88,0.10,'?',Math.min(1,(k-0.3)*4));
   }
-  if(t>5200) caption("can't stop her", seg(t,5200,5600));
+  if(t>5200) caption("gonna git ya", seg(t,5200,5600));
 }},
 {id:'audience',music:'arcade',e:'👹',title:'The Audience',note:'boss wave · 7s · the first tell',dur:7000,draw(t){
   stars(t);
@@ -275,7 +275,7 @@ const SCENES=[
   E('😈',0.25,0.72+hop(0),1.1);
   E('🐣',0.50,0.72+hop(0),1.2); // perfectly in sync — that's the gag
   E('😈',0.75,0.72+hop(0),1.1);
-  if(t>5600) caption('everyone needs a minute.', seg(t,5600,6100));
+  if(t>5600) caption("can't stop her", seg(t,5600,6100));
 }},
 {id:'tax',music:'arcade',e:'💸',title:'The Sass Tax',note:'mid-run · 6s',dur:6000,draw(t){
   stars(t); minus69(t);

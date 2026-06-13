@@ -735,6 +735,21 @@
     }, GRIND_MS);
   }
 
+  /* ----- echoed "oh no" game-over voice clip (HTMLAudio; like the cutscene mp3s) ----- */
+  let _ohNo=null;
+  function getOhNo(){ try{ if(!_ohNo){ _ohNo=new Audio('snd/realohno.mp3'); _ohNo.preload='auto'; } return _ohNo; }catch(e){ return null; } }
+  // Play once as the game-over signal. Gated on the voice toggle AND an unlocked audio
+  // context (same gate the rest of NG's audio relies on); fully wrapped so it never throws.
+  function playOhNo(){
+    try{
+      if(!voiceOn) return;
+      if(!AC || AC.state!=='running') return;
+      const a=getOhNo(); if(!a) return;
+      a.currentTime=0; a.volume=0.9;
+      const pr=a.play(); if(pr&&pr.catch) pr.catch(()=>{});
+    }catch(e){}
+  }
+
   /* ===== Leaderboard / HS (server) ===== */
   async function fetchTop(board){ try{
     const url=SCORES_ENDPOINT+'?game=new'+(board==='daily'?'&board=daily':'');
@@ -989,6 +1004,7 @@
     else { proceedGameOver(); }
   }
   function proceedGameOver(){
+    setTimeout(playOhNo, 600);   // echoed "OH NO" after the killing-blow fart (and after any jumpscare)
     runId=(Date.now().toString(36)+Math.random().toString(36).slice(2,10));
     stats.games++; stats.bestWave=Math.max(stats.bestWave,wave); saveStats(); renderStats();
     finalScore.textContent=fmt.format(Math.round(score));

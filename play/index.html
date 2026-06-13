@@ -776,6 +776,7 @@
   /* ===== WAVES ===== */
   function anyBarista(){ return bosses.some(b=>b.kind==='aura'); }
   function newWave(n=wave){
+    keys.shoot=keys.left=keys.right=false;   // clear held/lingering input so a new wave never auto-fires
     invaders.length=0; bosses.length=0; bossShots.length=0; mirrorShots.length=0; mirrors=[]; pools.length=0;
     invDir=1; edgeCD=0;
     const gapX=fontSize*1.55, gapY=fontSize*1.5;
@@ -886,9 +887,9 @@
     el.addEventListener('touchend',up,{passive:true}); el.addEventListener('touchcancel',up,{passive:true});
     el.addEventListener('mousedown',e=>{e.preventDefault();down(e);}); window.addEventListener('mouseup',up);
   }
-  hold(leftBtn ,()=>{if(running)keys.left=true;} ,()=>keys.left=false);
-  hold(rightBtn,()=>{if(running)keys.right=true;},()=>keys.right=false);
-  hold(fireBtn ,()=>{if(running){keys.shoot=true;fireShots();}},()=>keys.shoot=false);
+  hold(leftBtn ,()=>{if(running&&!cut.active)keys.left=true;} ,()=>keys.left=false);
+  hold(rightBtn,()=>{if(running&&!cut.active)keys.right=true;},()=>keys.right=false);
+  hold(fireBtn ,()=>{if(running&&!cut.active){keys.shoot=true;fireShots();}},()=>keys.shoot=false);
   bombBtn.addEventListener('click',e=>{e.preventDefault();detonateBomb();});
   scorchBtn.addEventListener('click',e=>{e.preventDefault();scorchedEarth();});
 
@@ -952,7 +953,7 @@
     goImmersive();
     if(window.SassCutscenes){ SassCutscenes.setVoice(voiceOn); SassCutscenes.unlockVoice(); }
     rulesOv.classList.remove('show'); scoresOv.classList.remove('show'); startOv.classList.remove('show');
-    resetGame(); running=true; requestAnimationFrame(loop);
+    resetGame(); running=true;   // single persistent loop (kicked off once at init) resumes gameplay
   }
   startBtn.addEventListener('click',startGame);
   /* ----- spoken-caption voice toggle (persisted) ----- */
@@ -1002,7 +1003,7 @@
       await renderTop(goScores, onBoard ? {score:score, initials:highName||'---'} : null);
     })();
   }
-  restart.addEventListener('click',()=>{ gameOver.classList.remove('show'); started=true; resetGame(); running=true; requestAnimationFrame(loop); });
+  restart.addEventListener('click',()=>{ gameOver.classList.remove('show'); started=true; resetGame(); running=true; });
   $('homeBtn').addEventListener('click',()=>{
     gameOver.classList.remove('show');
     startOv.classList.add('show');

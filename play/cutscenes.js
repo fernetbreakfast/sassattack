@@ -6,7 +6,7 @@ window.SassCutscenes=(function(){
 let ctx=null,W=0,H=0,FS=40;
 const CHAR_SCALE=1.65;   // bigger cutscene characters (+65%)
 const TIME_SCALE=1.5;    // slower pacing / longer scenes (+50%)
-let voiceOn=true, spokeCaption=false, chaseAudio=null;   // spoken-caption voice
+let voiceOn=true, spokeCaption=false, chaseAudio=null, audienceAudio=null;   // spoken-caption voice
 let acGet=null;
 function bind(c,w,h,f){ ctx=c; W=w; H=h; FS=f; }
 function setAudio(fn){ acGet=fn; }
@@ -452,6 +452,7 @@ const BYID={}; SCENES.forEach(s=>{ if(!s.grp) BYID[s.id]=s; });
 let current=null;
 /* ---------- spoken captions ---------- */
 function getChaseAudio(){ if(!chaseAudio){ chaseAudio=new Audio('snd/chase.mp3'); chaseAudio.preload='auto'; } return chaseAudio; }
+function getAudienceAudio(){ if(!audienceAudio){ audienceAudio=new Audio('snd/audience.mp3'); audienceAudio.preload='auto'; } return audienceAudio; }
 function duckMusic(on){
   try{ if(musicGain){ const A=ac(); const g=musicGain.gain;
     if(A){ g.cancelScheduledValues(A.currentTime); g.linearRampToValueAtTime(on?0.22:1.0,A.currentTime+0.08); }
@@ -462,24 +463,31 @@ function speak(txt){
   if(!voiceOn||!txt) return;
   duckMusic(true);
   const done=()=>duckMusic(false);
-  // Every scene (including 'chase') uses the TTS robot voice; the chase no
-  // longer plays the recorded snd/chase.mp3 (file kept in the repo, just unused).
-  try{ const ss=window.speechSynthesis;
-    if(!ss){ done(); return; }
-    ss.cancel();
-    const u=new SpeechSynthesisUtterance(txt);
-    u.rate=1; u.pitch=1; u.onend=done; u.onerror=done;
-    ss.speak(u);
-  }catch{ done(); }
+  // Scene 2 ('audience') plays a custom voice recording; every other scene
+  // (including 'chase') uses the TTS robot voice. snd/chase.mp3 stays unused.
+  if(current&&current.id==='audience'){
+    try{ const a=getAudienceAudio(); a.muted=false; a.currentTime=0; a.onended=done; a.onerror=done;
+      const pr=a.play(); if(pr&&pr.catch)pr.catch(done);
+    }catch{ done(); }
+  } else {
+    try{ const ss=window.speechSynthesis;
+      if(!ss){ done(); return; }
+      ss.cancel();
+      const u=new SpeechSynthesisUtterance(txt);
+      u.rate=1; u.pitch=1; u.onend=done; u.onerror=done;
+      ss.speak(u);
+    }catch{ done(); }
+  }
 }
 function cancelVoice(){
   try{ if(chaseAudio){ chaseAudio.pause(); chaseAudio.currentTime=0; } }catch{}
+  try{ if(audienceAudio){ audienceAudio.pause(); audienceAudio.currentTime=0; } }catch{}
   try{ if(window.speechSynthesis) window.speechSynthesis.cancel(); }catch{}
   duckMusic(false);
 }
 function setVoice(on){ voiceOn=!!on; if(!voiceOn) cancelVoice(); }
 function unlockVoice(){   // prime audio + speech inside the start-tap gesture (iOS/Android)
-  try{ const a=getChaseAudio(); a.muted=true; const pr=a.play();
+  try{ const a=getAudienceAudio(); a.muted=true; const pr=a.play();
     if(pr&&pr.then) pr.then(()=>{ a.pause(); a.currentTime=0; a.muted=false; }).catch(()=>{ a.muted=false; });
     else { try{a.pause();}catch{} a.muted=false; }
   }catch{}

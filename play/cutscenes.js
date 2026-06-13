@@ -4,6 +4,8 @@
 window.SassCutscenes=(function(){
 'use strict';
 let ctx=null,W=0,H=0,FS=40;
+const CHAR_SCALE=1.38;   // bigger cutscene characters (+38%)
+const TIME_SCALE=1.25;   // slower pacing / longer scenes (+25%)
 let acGet=null;
 function bind(c,w,h,f){ ctx=c; W=w; H=h; FS=f; }
 function setAudio(fn){ acGet=fn; }
@@ -20,7 +22,7 @@ function E(e,fx,fy,scale=1,alpha=1,rot=0){
   ctx.save(); ctx.globalAlpha=alpha;
   ctx.translate(fx*W,fy*H); if(rot)ctx.rotate(rot);
   ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.font=`bold ${FS*scale}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
+  ctx.font=`bold ${FS*scale*CHAR_SCALE}px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif`;
   ctx.fillText(e,0,0); ctx.restore();
 }
 const bob=(t,amp=0.008,spd=0.012)=>Math.sin(t*spd)*amp; // walk bounce
@@ -433,9 +435,9 @@ const SCENES=[
 const BYID={}; SCENES.forEach(s=>{ if(!s.grp) BYID[s.id]=s; });
 let current=null;
 function has(id){ return !!BYID[id]; }
-function dur(id){ return BYID[id]?BYID[id].dur:0; }
-function start(id){ current=BYID[id]||null; if(current) startMusic(current.music,current.dur,current.musicStop); return current?current.dur:0; }
-function draw(t){ if(current&&ctx) current.draw(t); }
+function dur(id){ return BYID[id]?BYID[id].dur*TIME_SCALE:0; }
+function start(id){ current=BYID[id]||null; if(current) startMusic(current.music,current.dur*TIME_SCALE,current.musicStop!=null?current.musicStop*TIME_SCALE:current.musicStop); return current?current.dur*TIME_SCALE:0; }
+function draw(t){ if(current&&ctx) current.draw(t/TIME_SCALE); }
 function stop(){ stopMusic(); current=null; }
 return {bind,setAudio,has,dur,start,draw,stop};
 })();

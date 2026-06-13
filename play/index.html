@@ -209,6 +209,12 @@
     opacity:0; transition:opacity .2s, transform .2s; z-index:8; pointer-events:none; white-space:nowrap;
   }
   .toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+  /* Jumpscare overlay (loss) */
+  .grind-ov{ position:fixed; inset:0; z-index:9999; display:none;
+    background:#000; align-items:center; justify-content:center;
+    -webkit-user-select:none; user-select:none; touch-action:none; }
+  .grind-ov.show{ display:flex; }
+  .grind-ov img{ width:100%; height:100%; object-fit:cover; display:block; }
 </style>
 </head>
 <body>
@@ -654,6 +660,76 @@
   const sfxHurt  =()=>blip(140,'square',0.25,0.5);
   const sfxBomb  =()=>{blip(80,'sawtooth',0.5,0.6); blip(220,'square',0.4,0.4);};
 
+  /* ----- loss FX: fart (every loss) + grinding noise (random jumpscare) ----- */
+  // Short low buzzy raspberry: ~120->70Hz sawtooth, amplitude fluttered by a
+  // ~24Hz square LFO, plus a touch of low-passed noise; ~0.6s with quick decay.
+  function sfxFart(){
+    const A=ac(); if(!A) return;
+    const t=A.currentTime, dur=0.6;
+    const o=A.createOscillator(); o.type='sawtooth';
+    o.frequency.setValueAtTime(120,t); o.frequency.exponentialRampToValueAtTime(70,t+dur);
+    const g=A.createGain();
+    g.gain.setValueAtTime(0.0001,t); g.gain.linearRampToValueAtTime(0.6,t+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    const lfo=A.createOscillator(); lfo.type='square'; lfo.frequency.setValueAtTime(24,t); // flutter
+    const lfoGain=A.createGain(); lfoGain.gain.value=0.45;
+    lfo.connect(lfoGain); lfoGain.connect(g.gain);              // modulate amplitude
+    // a touch of noise through a low-pass for the wet edge
+    const nb=A.createBuffer(1, Math.max(1,Math.floor(A.sampleRate*dur)), A.sampleRate);
+    const nd=nb.getChannelData(0); for(let i=0;i<nd.length;i++) nd[i]=(Math.random()*2-1)*0.3;
+    const ns=A.createBufferSource(); ns.buffer=nb;
+    const lp=A.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=550;
+    const ng=A.createGain(); ng.gain.setValueAtTime(0.25,t); ng.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(g); g.connect(A.destination);
+    ns.connect(lp); lp.connect(ng); ng.connect(A.destination);
+    o.start(t); o.stop(t+dur); lfo.start(t); lfo.stop(t+dur); ns.start(t); ns.stop(t+dur);
+  }
+  // Harsh sustained grinding: detuned dissonant low saws + heavy band-passed
+  // noise, all clipped through a tanh waveshaper, amplitude chewed by a slow
+  // saw LFO. Returns a stop() that ramps it down and stops every source.
+  function playGrind(){
+    const A=ac(); if(!A) return ()=>{};
+    const t=A.currentTime;
+    const master=A.createGain(); master.gain.setValueAtTime(0.0001,t); master.gain.linearRampToValueAtTime(0.5,t+0.15);
+    const shaper=A.createWaveShaper();
+    const curve=new Float32Array(1024); for(let i=0;i<1024;i++){ const x=i/1024*2-1; curve[i]=Math.tanh(x*8); }
+    shaper.curve=curve; shaper.oversample='4x';
+    const oscs=[]; [46, 47.7, 69, 92.5].forEach(fq=>{    // dissonant, detuned, low
+      const o=A.createOscillator(); o.type='sawtooth'; o.frequency.value=fq;
+      const og=A.createGain(); og.gain.value=0.5; o.connect(og); og.connect(shaper); o.start(t); oscs.push(o);
+    });
+    const nb=A.createBuffer(1, Math.floor(A.sampleRate*2), A.sampleRate);
+    const nd=nb.getChannelData(0); for(let i=0;i<nd.length;i++) nd[i]=Math.random()*2-1;
+    const ns=A.createBufferSource(); ns.buffer=nb; ns.loop=true;
+    const bp=A.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=150; bp.Q.value=0.6;
+    const ng=A.createGain(); ng.gain.value=0.7; ns.connect(bp); bp.connect(ng); ng.connect(shaper); ns.start(t);
+    const lfo=A.createOscillator(); lfo.type='sawtooth'; lfo.frequency.value=11;  // grind chew
+    const lfoG=A.createGain(); lfoG.gain.value=0.35; lfo.connect(lfoG); lfoG.connect(master.gain); lfo.start(t);
+    shaper.connect(master); master.connect(A.destination);
+    return function stop(){
+      try{ const tt=A.currentTime;
+        master.gain.cancelScheduledValues(tt); master.gain.setValueAtTime(Math.max(0.0001,master.gain.value),tt);
+        master.gain.linearRampToValueAtTime(0.0001,tt+0.08);
+        oscs.forEach(o=>{ try{o.stop(tt+0.1);}catch(e){} });
+        try{ns.stop(tt+0.1);}catch(e){} try{lfo.stop(tt+0.1);}catch(e){}
+      }catch(e){}
+    };
+  }
+  // Tweakable: chance a loss triggers the 5s jumpscare image + grinding noise.
+  const GRIND_CHANCE = 0.2;   // ~1 in 5
+  const GRIND_MS = 5000;      // overlay duration
+  function runJumpscare(done){
+    const ov=$('grindOv'); if(!ov){ done(); return; }
+    ov.classList.add('show'); ov.setAttribute('aria-hidden','false');
+    let stopGrind=()=>{};
+    try{ stopGrind=playGrind(); }catch(e){}
+    setTimeout(()=>{
+      try{ stopGrind(); }catch(e){}
+      ov.classList.remove('show'); ov.setAttribute('aria-hidden','true');
+      try{ done(); }catch(e){}
+    }, GRIND_MS);
+  }
+
   /* ===== Leaderboard / HS (server) ===== */
   async function fetchTop(board){ try{
     const url=SCORES_ENDPOINT+'?game=new'+(board==='daily'?'&board=daily':'');
@@ -898,7 +974,15 @@
   }
   function hasInitials(){ return !!highName && highName.trim() && highName!=='---'; }
   function gameOverScreen(){
-    running=false; started=false; sfxHurt(); shake(20,500);
+    running=false; started=false;
+    sfxHurt(); sfxFart();              // fart immediately on every loss
+    shake(20,500);
+    // Random jumpscare: GRIND_CHANCE of the time, show the image + grinding
+    // noise for 5s, THEN run the normal game-over flow; otherwise run it now.
+    if(Math.random() < GRIND_CHANCE){ runJumpscare(proceedGameOver); }
+    else { proceedGameOver(); }
+  }
+  function proceedGameOver(){
     runId=(Date.now().toString(36)+Math.random().toString(36).slice(2,10));
     stats.games++; stats.bestWave=Math.max(stats.bestWave,wave); saveStats(); renderStats();
     finalScore.textContent=fmt.format(Math.round(score));
@@ -1204,5 +1288,7 @@
   (async()=>{ try{ await syncHigh(); }catch{} try{ await renderTop(startScores); }catch{} })();
 })();
 </script>
+  <!-- Jumpscare image overlay (random, on loss) -->
+  <div id="grindOv" class="grind-ov" aria-hidden="true"><img src="img/grind.jpg" alt="" /></div>
 </body>
 </html>

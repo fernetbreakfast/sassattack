@@ -488,6 +488,7 @@
 
   /* ===== STATE ===== */
   let running=false, started=false, lastTime=performance.now();
+  let gameOverFired=false;   // ensures the game-over sequence (incl. jumpscare) runs exactly once
   let W=0,H=0,fontSize=64, slowmo=1, shakeT=0, shakeMag=0, flashT=0;
   let score=0, lives=5, wave=1, highAtRun=0, bombs=Math.min(3,MODE.maxBomb);
   let runId='';
@@ -722,7 +723,10 @@
   }
   // Tweakable: chance a loss triggers the 5s jumpscare image + grinding noise.
   const GRIND_CHANCE = 0.2;   // ~1 in 5
-  const GRIND_MS = 5000;      // overlay duration
+  const GRIND_MS = 5000;      // overlay duration (image + grinding noise, in sync)
+  // Preload + decode grind.jpg up front so it's ready to paint full-screen the instant the overlay shows.
+  const grindImg=new Image(); grindImg.src='img/grind.jpg';
+  try{ if(grindImg.decode) grindImg.decode().catch(()=>{}); }catch(e){}
   function runJumpscare(done){
     const ov=$('grindOv'); if(!ov){ done(); return; }
     ov.classList.add('show'); ov.setAttribute('aria-hidden','false');
@@ -956,6 +960,7 @@
     shots.length=splashes.length=booms.length=bossShots.length=invaders.length=drops.length=pools.length=0;
     bosses=[]; mirrors=[]; mirrorShots.length=0;
     player.spread=player.rapid=player.shield=player.power=0; player.x=W/2;
+    gameOverFired=false;
     newWave(1); lastTime=performance.now();
   }
   // Best-effort immersive/fullscreen on the start gesture. Real Fullscreen API
@@ -995,6 +1000,8 @@
   }
   function hasInitials(){ return !!highName && highName.trim() && highName!=='---'; }
   function gameOverScreen(){
+    if(gameOverFired) return;   // run once per death (bottom-row check can call this repeatedly in one frame)
+    gameOverFired=true;
     running=false; started=false;
     sfxHurt(); sfxFart();              // fart immediately on every loss
     shake(20,500);

@@ -424,7 +424,7 @@
   const MODES={
     sunny:{e:'🍳',name:'SUNNY SIDE', lives:6, spd:0.85,fire:0.85,drop:0.15, bdrop:0.9, mWave:8, mCount:1, mul:1,   scorch:0.20, bossWave:3, unlockShift:0},
     spicy:{e:'🌶️',name:'SPICY',      lives:5, spd:1.0, fire:1.0, drop:0.12, bdrop:0.9, mWave:8, mCount:1, mul:1.5, scorch:0.20, bossWave:2, unlockShift:0},
-    death:{e:'💀',name:'SASS DEATH', lives:3, spd:1.35,fire:1.4, drop:0.08, bdrop:0.8, mWave:7, mCount:2, mul:3,   scorch:0.25, bossWave:1, unlockShift:1}
+    death:{e:'💀',name:'SASS DEATH', lives:3, spd:1.70,fire:1.85, drop:0.06, bdrop:0.8, mWave:7, mCount:2, mul:3,   scorch:0.25, bossWave:1, unlockShift:1}
   };
   let modeKey=store.get('sass_mode')||'sunny';
   if(!MODES[modeKey])modeKey='sunny';
@@ -1144,7 +1144,7 @@
       else {
         const inten=Math.sin(k*Math.PI);
         ctx.save(); ctx.globalAlpha=0.3*inten; ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H); ctx.restore();
-        const by=H*(k<0.3?(k/0.3)*0.18:(k>0.7?0.18*(1-(k-0.7)/0.3):0.18));
+        const by=H*(k<0.3?(k/0.3)*0.34:(k>0.7?0.34*(1-(k-0.7)/0.3):0.34));
         for(let i=0;i<10;i++){
           const a=now*0.0015+i*0.628;
           ctx.save(); ctx.globalAlpha=0.12*inten;

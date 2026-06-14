@@ -812,24 +812,40 @@
     setSaveStatus('saving score…','wait');
     const h={'Content-Type':'application/json','X-Score-Token':SCORE_TOKEN};
     const runId=Date.now().toString(36)+Math.random().toString(36).slice(2,10);
-    const body=JSON.stringify({ score:Math.round(score), initials:ini, run_id:runId, mode:'', game:GAME });
     const sc=Math.round(score);
+    const lbBody=JSON.stringify({ score:sc, initials:ini, run_id:runId, mode:'', game:GAME });
+    const hsBody=JSON.stringify({ score:sc, initials:ini, game:GAME });
+    // ===== POST 1: leaderboard.php (the board the top-10 reads) =====
     let r;
-    try{ r=await fetchT(SCORES_ENDPOINT,{method:'POST',headers:h,body}); }
+    try{ r=await fetchT(SCORES_ENDPOINT,{method:'POST',headers:h,body:lbBody}); }
     catch(e){
       console.error('[boat] leaderboard POST failed (network/CORS/timeout):', e);
       setSaveStatus('⚠ save failed: '+(e&&e.message||'network'),'err');
-      try{ window.alert('SAVE FAILED: '+(e&&(e.name+': '+e.message)||e)); }catch(_){}   // TEMP unmissable diagnostic
+      try{ window.alert('SAVE FAILED: '+(e&&(e.name+': '+e.message)||e)+'\n\nURL: '+SCORES_ENDPOINT+'\nGAME: '+GAME); }catch(_){}  // TEMP diagnostic
       return;
     }
-    let txt=''; try{ txt=await r.text(); }catch(_){}
-    console.log('[boat] leaderboard POST ->', r.status, r.statusText, '| body:', body, '| response:', String(txt).slice(0,300));
-    try{ window.alert('SAVE: '+r.status+' '+r.statusText+'  | game='+GAME+'  | score='+sc+'  | initials='+ini); }catch(_){}  // TEMP unmissable diagnostic
+    const lbText = await r.text().catch(()=> '');   // READ THE RESPONSE BODY (server's real error message)
+    console.log('[boat] leaderboard POST ->', r.status, r.statusText, '| body:', lbBody, '| response:', String(lbText).slice(0,400));
     if(r.ok) setSaveStatus('✓ Score saved to leaderboard','ok');
     else setSaveStatus('⚠ save failed: '+r.status+(r.statusText?(' '+r.statusText):''),'err');
-    // also fire the global hi-score post (best-effort; does NOT affect the leaderboard row)
-    try{ const hr=await fetchT(SCORE_ENDPOINT,{method:'POST',headers:h,body:JSON.stringify({ score:Math.round(score), initials:ini, game:GAME })});
-      console.log('[boat] hscore POST ->', hr.status); }catch(e){ console.warn('[boat] hscore POST failed (non-fatal):', e&&e.message); }
+    const lbLine='[LEADERBOARD] '+r.status+' '+r.statusText
+      +'\nURL: '+SCORES_ENDPOINT+'\nGAME: '+GAME
+      +'\nBODY: '+String(lbText).slice(0,400);
+    // ===== POST 2: hscore.php (global hi-score; does NOT affect the leaderboard top-10) =====
+    let hsLine;
+    try{
+      const hr=await fetchT(SCORE_ENDPOINT,{method:'POST',headers:h,body:hsBody});
+      const hsText = await hr.text().catch(()=> '');
+      console.log('[boat] hscore POST ->', hr.status, hr.statusText, '| response:', String(hsText).slice(0,400));
+      hsLine='[HSCORE] '+hr.status+' '+hr.statusText
+        +'\nURL: '+SCORE_ENDPOINT+'\nGAME: '+GAME
+        +'\nBODY: '+String(hsText).slice(0,400);
+    }catch(e){
+      console.warn('[boat] hscore POST failed (non-fatal):', e&&e.message);
+      hsLine='[HSCORE] FAILED: '+(e&&(e.name+': '+e.message)||e)+'\nURL: '+SCORE_ENDPOINT+'\nGAME: '+GAME;
+    }
+    // ONE unmissable alert showing status + RESPONSE BODY + URL + game for EACH endpoint
+    try{ window.alert('SAVE  score='+sc+'  initials='+ini+'\n\n'+lbLine+'\n\n'+hsLine); }catch(_){}  // TEMP diagnostic
   }
   // cross-game application targets (2-player only): NG/OG/GYUH leaderboards
   const APPLY_GAMES = [ { key:'new', label:'NG' }, { key:'old', label:'OG' }, { key:'memory', label:'GYUH' } ];

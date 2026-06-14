@@ -738,6 +738,11 @@
   function cxAt(t){ return CX + bendPx(t); }
   function xAt(xRel, t){ return cxAt(t) + xRel*halfW(t); }
   const SB = 3;                 // boat block scale (16-bit chunky)
+  // BOAT_T = the boat's perspective position. Raised from 0.90 -> 0.76 so that, now the canvas fills the FULL
+  // screen height, the boat sprite + the collect/dodge action sit ABOVE the bottom control buttons (which are
+  // anchored at the very bottom) and never get covered. The water below the boat just sits behind the buttons.
+  const BOAT_T = 0.76;
+  const HIT_LO = BOAT_T - 0.10, HIT_HI = BOAT_T + 0.09;   // collision window tracks the boat's new position
 
   /* ===== online leaderboard (game id 'boat') =====
      BACKEND: 'boat' must be enabled in config.php clean_game() + seeded in the highscore table
@@ -760,6 +765,29 @@
       body:JSON.stringify({ score:Math.round(score), initials:ini, game })}); }catch(e){}
   }
   function postScore(score, ini){ return postScoreTo(GAME, score, ini); }   // boat board (unchanged behavior)
+  // VISIBLE save status (diagnostic): paint the leaderboard.php POST's ACTUAL result onto the results screen.
+  function setSaveStatus(text, kind){
+    const el=$('resPosted'); if(!el) return;
+    el.textContent=text;
+    el.style.color = kind==='ok' ? '#37ffb0' : (kind==='err' ? '#ff7a7a' : '#8b93c0');
+  }
+  // Save the BOAT score to the leaderboard table and report the real outcome (HTTP status / network error).
+  async function saveBoatScore(score, ini){
+    setSaveStatus('saving score…','wait');
+    const h={'Content-Type':'application/json','X-Score-Token':SCORE_TOKEN};
+    const runId=Date.now().toString(36)+Math.random().toString(36).slice(2,10);
+    const body=JSON.stringify({ score:Math.round(score), initials:ini, run_id:runId, mode:'', game:GAME });
+    let r;
+    try{ r=await fetchT(SCORES_ENDPOINT,{method:'POST',headers:h,body}); }
+    catch(e){ console.error('[boat] leaderboard POST failed (network/CORS/timeout):', e); setSaveStatus('⚠ save failed: '+(e&&e.message||'network'),'err'); return; }
+    let txt=''; try{ txt=await r.text(); }catch(_){}
+    console.log('[boat] leaderboard POST ->', r.status, r.statusText, '| body:', body, '| response:', String(txt).slice(0,300));
+    if(r.ok) setSaveStatus('✓ Score saved to leaderboard','ok');
+    else setSaveStatus('⚠ save failed: '+r.status+(r.statusText?(' '+r.statusText):''),'err');
+    // also fire the global hi-score post (best-effort; does NOT affect the leaderboard row)
+    try{ const hr=await fetchT(SCORE_ENDPOINT,{method:'POST',headers:h,body:JSON.stringify({ score:Math.round(score), initials:ini, game:GAME })});
+      console.log('[boat] hscore POST ->', hr.status); }catch(e){ console.warn('[boat] hscore POST failed (non-fatal):', e&&e.message); }
+  }
   // cross-game application targets (2-player only): NG/OG/GYUH leaderboards
   const APPLY_GAMES = [ { key:'new', label:'NG' }, { key:'old', label:'OG' }, { key:'memory', label:'GYUH' } ];
 
@@ -813,7 +841,7 @@
     if(G.rescued<=0){ AudioFX.turn(); return; } // out of ammo -> soft tick
     G.rescued--; G.score -= CHICKEN_VALUE;        // chucking a chicken costs you that bird's cool million
     G.throwCool=0.28; updateHUD();
-    const x=xAt(G.boatX,0.9), y=yAt(0.9)-30;
+    const x=xAt(G.boatX,BOAT_T), y=yAt(BOAT_T)-30;
     let tx=x, best=1e9;                          // aim at the nearest live hawk
     for(const hk of G.hawks){ if(hk.dead) continue; const d=Math.abs(hk.x-x)+Math.abs(hk.y-y); if(d<best){ best=d; tx=hk.x; } }
     const vx=Math.max(-150, Math.min(150, (tx-x)*1.5));
@@ -827,7 +855,7 @@
     if(G.rescued<=0){ AudioFX.turn(); return; }     // soft nope -> need >=1 rescued chicken
     G.state='capsize'; G.lastCapsize=true; G.score += JACKPOT_VALUE;   // the $10,000,000 cash-out prize
     AudioFX.sink();                                  // dramatic descending foghorn + splash sting
-    const bx0=xAt(G.boatX,0.9), by0=yAt(0.9)-30, groundY=yAt(0.9)-12;
+    const bx0=xAt(G.boatX,BOAT_T), by0=yAt(BOAT_T)-30, groundY=yAt(BOAT_T)-12;
     G.cap={ t:0, dur:4.2, roll:0, sink:0, waterRise:0, bubbleT:0, fanfare:false, parts:[], bubbles:[],
             riders:[ { x:bx0-16, y:by0, vx:-46, vy:-120, ph:Math.random()*6, kind:'pink' },
                      { x:bx0+16, y:by0, vx: 46, vy:-100, ph:Math.random()*6, kind:'hat'  } ] };
@@ -840,7 +868,7 @@
   }
   function updateCapsize(dt){
     const c=G.cap; if(!c){ endRun(); return; }
-    const groundY=yAt(0.9)-12, bx0=xAt(G.boatX,0.9);
+    const groundY=yAt(BOAT_T)-12, bx0=xAt(G.boatX,BOAT_T);
     waterPhase += dt*1.4;
     c.t+=dt;
     c.roll=Math.min(1.7, c.roll+dt*1.3);            // slow dramatic tilt
@@ -877,7 +905,7 @@
   }
   function drawCapsize(){
     const c=G.cap; if(!c) return;
-    const bx0=xAt(G.boatX,0.9), groundY=yAt(0.9)-12;
+    const bx0=xAt(G.boatX,BOAT_T), groundY=yAt(BOAT_T)-12;
     // initial splash ring
     const k=Math.min(1,c.t/0.6);
     bx.globalAlpha=Math.max(0,1-c.t/1.4); bx.strokeStyle='#dff4ff'; bx.lineWidth=4;
@@ -1001,7 +1029,7 @@
     // (previously gated behind G.dist>500 ~= 25s of flawless running, so most runs ended before a single
     //  hawk ever spawned and the THROW button had nothing to target. Now they show up early and reliably.)
     if(G.t>4){ G.hawkT -= dt; if(G.hawkT<=0){ spawnHawk(); G.hawkT = (2.6 + Math.random()*2.2) - Math.min(1.2, G.dist/4000); } }
-    const bScreenX=xAt(G.boatX,0.9), bY=yAt(0.9)-12;
+    const bScreenX=xAt(G.boatX,BOAT_T), bY=yAt(BOAT_T)-12;
     for(const hk of G.hawks){
       if(hk.dead) continue;
       hk.t += dt;
@@ -1011,7 +1039,7 @@
       hk.y += (hk.t<1.6 ? 40 : 120)*dt;                      // SLOWER: longer hover/telegraph (1.6s) + a gentle dive (120) so there's a real window to throw a chicken at it (was 0.95s telegraph @64 + fast 250 dive)
       if(!hk.struck && hk.y>=bY-12){
         hk.struck=true; hk.dead=true;
-        const dx=Math.abs(hk.x - xAt(G.boatX,0.9));          // must STILL be aligned at impact -> dodge by steering away
+        const dx=Math.abs(hk.x - xAt(G.boatX,BOAT_T));          // must STILL be aligned at impact -> dodge by steering away
         if(dx<24 && G.inv<=0){ G.lives--; G.inv=1.4; G.shake=0.4; AudioFX.hit();
           if(G.lives<=0){ gameOver(); return; } else AudioFX.lifeLost(); }
         else if(dx>=24){ G.pops.push({ x:hk.x, y:bY-8, age:0 }); }   // clean near-miss puff
@@ -1039,7 +1067,7 @@
       if(it.gone) continue;
       it.t += G.speed*dt;
       if(it.t>1.18){ it.gone=true; continue; }
-      if(it.t>0.80 && it.t<0.99 && !it.hit){
+      if(it.t>HIT_LO && it.t<HIT_HI && !it.hit){
         const dxRel=Math.abs(it.xRel-G.boatX);
         const thresh = it.kind==='obs' ? (it.hw/BOTW + 0.14) : (it.hw/BOTW + 0.12);
         if(dxRel<thresh){
@@ -1219,7 +1247,7 @@
     bx.fillStyle=PAL.Y; bx.fillRect(fx+j,   fy+1, 1, 2+tip);   // white-hot core
   }
   function drawBoat(){
-    const t=0.9, groundY=yAt(t)-12, x=xAt(G.boatX,t);
+    const t=BOAT_T, groundY=yAt(t)-12, x=xAt(G.boatX,t);
     const h=G.jumpH; const y=groundY-h;
     const shW=Math.max(10, 52*(1-Math.min(0.78, h/80)));
     bx.fillStyle='rgba(8,20,40,0.30)';
@@ -1237,7 +1265,7 @@
   }
 
   function drawHawks(){
-    const bY=yAt(0.9)-12;
+    const bY=yAt(BOAT_T)-12;
     for(const hk of G.hawks){
       if(hk.dead) continue;
       const prog=Math.max(0,Math.min(1,(hk.y-(HZ-8))/(bY-(HZ-8))));
@@ -1290,7 +1318,7 @@
     bx.globalAlpha=Math.min(1,d*1.15);                                                    // rolling dark clouds up top
     for(let i=0;i<5;i++){ const cw=((i*83 + Math.floor(waterPhase*9)) % (BASE_W+90))-45; drawStormCloud(cw, 16+i*9, 1.3+(i%3)*0.5); }
     bx.globalAlpha=1;
-    const bxp=xAt(G.boatX,0.9), byp=yAt(0.9)-12-(G.jumpH||0);
+    const bxp=xAt(G.boatX,BOAT_T), byp=yAt(BOAT_T)-12-(G.jumpH||0);
     drawUmbrella(bxp, byp-48, umbrellaUp());                                              // Sass's auto-umbrella over the boat
     if(s.flash>0){ bx.fillStyle='rgba(235,245,255,'+(0.55*Math.min(1,s.flash))+')'; bx.fillRect(0,0,BASE_W,BASE_H); drawBolt(s.boltX); }
   }
@@ -1403,7 +1431,7 @@
   function finalizeRun(){
     players[cur].score=Math.floor(G.score); players[cur].rescued=G.rescued;
     if(G.score>G.best){ G.best=Math.floor(G.score); try{ localStorage.setItem('boat_best', String(G.best)); }catch(e){} }
-    postScore(players[cur].score, players[cur].ini);          // online leaderboard (game='boat') — unchanged
+    saveBoatScore(players[cur].score, players[cur].ini);      // online leaderboard (game='boat') + VISIBLE save status
     if(mode===2 && cur===0){ showPass(); } else { showResults(); }
   }
   function showPass(){

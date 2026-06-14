@@ -42,13 +42,13 @@
   .btn.alt{ background:linear-gradient(90deg,#ff3b6b,#ffd23f); color:#1a0008; box-shadow:0 8px 24px rgba(255,59,107,.4); }
   .small{ color:#8b93c0; font-size:12px; }
   /* always-visible save-status banner (fixed at top so it can't be clipped by the centered results layer) */
-  #saveStatus{ position:fixed; top:max(10px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
-    z-index:90; max-width:92vw; padding:9px 16px; border-radius:12px; font-family:inherit; font-weight:900;
-    font-size:15px; letter-spacing:.5px; text-align:center; color:#05060f; background:#9fe6ff;
-    box-shadow:0 6px 20px rgba(0,0,0,.55); border:2px solid rgba(255,255,255,.45); pointer-events:none; }
-  #saveStatus.wait{ background:#ffd23f; }
-  #saveStatus.ok{ background:#37ffb0; }
-  #saveStatus.err{ background:#ff6b6b; color:#1a0008; }
+  /* small, unobtrusive save confirmation pill (top-center) */
+  #saveStatus{ position:fixed; top:max(8px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
+    z-index:90; padding:3px 10px; border-radius:999px; font-family:inherit; font-weight:700;
+    font-size:12px; letter-spacing:.3px; text-align:center; color:#0a0c1a; background:rgba(159,230,255,.9);
+    box-shadow:0 2px 8px rgba(0,0,0,.35); pointer-events:none; opacity:.92; }
+  #saveStatus.ok{ background:rgba(55,255,176,.92); }
+  #saveStatus.err{ background:rgba(255,150,150,.95); }
   #goScore{ font-size:clamp(40px,13vw,68px); margin:0; color:#fff; }
   #goRescued{ margin:0; color:#ffd23f; font-size:clamp(16px,5vw,22px); }
   #goBest{ margin:0; color:#9fe6ff; font-size:16px; }
@@ -800,52 +800,33 @@
   // centered results layer, plus the legacy #resPosted line. (#resPosted is the last child of an
   // overflow-clipped, vertically-centered .layer, so on phone-height screens it was being pushed
   // off-screen — which is why the save status "never appeared".)
+  let saveStatusTimer=null;
   function setSaveStatus(text, kind){
     const b=$('saveStatus');
-    if(b){ b.textContent=text; b.classList.remove('hidden','ok','err','wait'); if(kind) b.classList.add(kind); }
-    const el=$('resPosted');
-    if(el){ el.textContent=text; el.style.color = kind==='ok' ? '#37ffb0' : (kind==='err' ? '#ff7a7a' : '#9fe6ff'); }
+    if(b){ b.textContent=text; b.classList.remove('hidden','ok','err','wait'); if(kind) b.classList.add(kind);
+      if(saveStatusTimer){ clearTimeout(saveStatusTimer); saveStatusTimer=null; }
+      if(kind==='ok'){ saveStatusTimer=setTimeout(hideSaveStatus, 2000); }   // tiny "✓ saved" auto-hides after ~2s
+    }
   }
-  function hideSaveStatus(){ const b=$('saveStatus'); if(b) b.classList.add('hidden'); }
+  function hideSaveStatus(){ if(saveStatusTimer){ clearTimeout(saveStatusTimer); saveStatusTimer=null; } const b=$('saveStatus'); if(b) b.classList.add('hidden'); }
   // Save the BOAT score to the leaderboard table and report the real outcome (HTTP status / network error).
   async function saveBoatScore(score, ini){
-    setSaveStatus('saving score…','wait');
     const h={'Content-Type':'application/json','X-Score-Token':SCORE_TOKEN};
     const runId=Date.now().toString(36)+Math.random().toString(36).slice(2,10);
     const sc=Math.round(score);
     const lbBody=JSON.stringify({ score:sc, initials:ini, run_id:runId, mode:'', game:GAME });
     const hsBody=JSON.stringify({ score:sc, initials:ini, game:GAME });
-    // ===== POST 1: leaderboard.php (the board the top-10 reads) =====
+    // POST 1: leaderboard.php (the board the top-10 reads)
     let r;
     try{ r=await fetchT(SCORES_ENDPOINT,{method:'POST',headers:h,body:lbBody}); }
-    catch(e){
-      console.error('[boat] leaderboard POST failed (network/CORS/timeout):', e);
-      setSaveStatus('⚠ save failed: '+(e&&e.message||'network'),'err');
-      try{ window.alert('SAVE FAILED: '+(e&&(e.name+': '+e.message)||e)+'\n\nURL: '+SCORES_ENDPOINT+'\nGAME: '+GAME); }catch(_){}  // TEMP diagnostic
-      return;
-    }
-    const lbText = await r.text().catch(()=> '');   // READ THE RESPONSE BODY (server's real error message)
-    console.log('[boat] leaderboard POST ->', r.status, r.statusText, '| body:', lbBody, '| response:', String(lbText).slice(0,400));
-    if(r.ok) setSaveStatus('✓ Score saved to leaderboard','ok');
-    else setSaveStatus('⚠ save failed: '+r.status+(r.statusText?(' '+r.statusText):''),'err');
-    const lbLine='[LEADERBOARD] '+r.status+' '+r.statusText
-      +'\nURL: '+SCORES_ENDPOINT+'\nGAME: '+GAME
-      +'\nBODY: '+String(lbText).slice(0,400);
-    // ===== POST 2: hscore.php (global hi-score; does NOT affect the leaderboard top-10) =====
-    let hsLine;
-    try{
-      const hr=await fetchT(SCORE_ENDPOINT,{method:'POST',headers:h,body:hsBody});
-      const hsText = await hr.text().catch(()=> '');
-      console.log('[boat] hscore POST ->', hr.status, hr.statusText, '| response:', String(hsText).slice(0,400));
-      hsLine='[HSCORE] '+hr.status+' '+hr.statusText
-        +'\nURL: '+SCORE_ENDPOINT+'\nGAME: '+GAME
-        +'\nBODY: '+String(hsText).slice(0,400);
-    }catch(e){
-      console.warn('[boat] hscore POST failed (non-fatal):', e&&e.message);
-      hsLine='[HSCORE] FAILED: '+(e&&(e.name+': '+e.message)||e)+'\nURL: '+SCORE_ENDPOINT+'\nGAME: '+GAME;
-    }
-    // ONE unmissable alert showing status + RESPONSE BODY + URL + game for EACH endpoint
-    try{ window.alert('SAVE  score='+sc+'  initials='+ini+'\n\n'+lbLine+'\n\n'+hsLine); }catch(_){}  // TEMP diagnostic
+    catch(e){ console.error('[boat] leaderboard POST failed:', e); setSaveStatus('⚠ score not saved','err'); return; }
+    console.log('[boat] leaderboard POST ->', r.status, r.statusText);
+    if(r.ok) setSaveStatus('✓ saved','ok');
+    else setSaveStatus('⚠ score not saved','err');
+    // POST 2: hscore.php (global hi-score; does NOT affect the leaderboard top-10)
+    try{ const hr=await fetchT(SCORE_ENDPOINT,{method:'POST',headers:h,body:hsBody});
+      console.log('[boat] hscore POST ->', hr.status); }
+    catch(e){ console.warn('[boat] hscore POST failed (non-fatal):', e&&e.message); }
   }
   // cross-game application targets (2-player only): NG/OG/GYUH leaderboards
   const APPLY_GAMES = [ { key:'new', label:'NG' }, { key:'old', label:'OG' }, { key:'memory', label:'GYUH' } ];

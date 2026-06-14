@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<title>SassPack &mdash; Chicken Rescue</title>
+<title>SassPack &mdash; Chuck a Chicken</title>
 <link rel="icon" type="image/png" href="/gfx/eggman_final.png" />
 <style>
   :root{ color-scheme: dark; --ink:#0a0c1a; }
@@ -56,19 +56,46 @@
   #best{ font-size:12px; color:#ffd23f; letter-spacing:1px; }
   #pad{ position:absolute; left:0; right:0; bottom:0; display:flex; justify-content:space-between;
     padding:0 14px max(18px,env(safe-area-inset-bottom)); pointer-events:none; }
-  .dbtn{ pointer-events:auto; width:clamp(72px,24vw,120px); height:clamp(72px,24vw,120px);
-    border-radius:24px; border:3px solid rgba(255,255,255,.35); background:rgba(10,16,40,.42);
-    color:#fff; font-size:48px; font-weight:900; display:flex; align-items:center; justify-content:center;
+  .dbtn{ pointer-events:auto; width:clamp(56px,18.5vw,100px); height:clamp(56px,18.5vw,100px);
+    border-radius:22px; border:3px solid rgba(255,255,255,.35); background:rgba(10,16,40,.42);
+    color:#fff; font-size:38px; font-weight:900; display:flex; align-items:center; justify-content:center;
     backdrop-filter:blur(2px); transition:transform .06s, background .1s; }
   .dbtn:active{ background:rgba(0,224,255,.35); transform:scale(.96); }
-  .dbtn.jump{ width:clamp(60px,18vw,92px); height:clamp(60px,18vw,92px);
-    font-size:clamp(12px,3.8vw,17px); align-self:flex-end; margin-bottom:8px;
-    border-color:rgba(255,210,63,.6); background:rgba(60,42,8,.42); color:#ffd23f; letter-spacing:1px; }
+  .dbtn.mini{ width:clamp(50px,14vw,76px); height:clamp(50px,14vw,76px);
+    font-size:clamp(10px,3.2vw,15px); align-self:flex-end; margin-bottom:8px; letter-spacing:1px; }
+  .dbtn.jump{ border-color:rgba(255,210,63,.6); background:rgba(60,42,8,.42); color:#ffd23f; }
   .dbtn.jump:active{ background:rgba(255,210,63,.35); }
-  .dbtn.throw{ width:clamp(60px,18vw,92px); height:clamp(60px,18vw,92px);
-    font-size:clamp(12px,3.8vw,17px); align-self:flex-end; margin-bottom:8px;
-    border-color:rgba(120,255,150,.6); background:rgba(18,56,28,.46); color:#9bffb4; letter-spacing:1px; }
+  .dbtn.throw{ border-color:rgba(120,255,150,.6); background:rgba(18,56,28,.46); color:#9bffb4; }
   .dbtn.throw:active{ background:rgba(120,255,150,.32); }
+  .dbtn.chuckall{ border-color:rgba(255,120,80,.7); background:rgba(70,24,10,.5); color:#ffb27a; line-height:1.0; }
+  .dbtn.chuckall:active{ background:rgba(255,120,80,.34); }
+  /* on-screen QWERTY keyboard + initials slots (no native OS keyboard) */
+  .kbd{ display:flex; flex-direction:column; gap:6px; align-items:stretch; width:min(94vw,440px); margin:6px 0 2px; }
+  .kbd-row{ display:flex; gap:5px; justify-content:center; }
+  .key2{ -webkit-tap-highlight-color:transparent; cursor:pointer; flex:1 1 0; min-width:0; height:44px; padding:0 2px;
+    display:grid; place-items:center; border-radius:9px; font-family:inherit; font-size:clamp(13px,4.2vw,18px); font-weight:900;
+    color:#fff; border:1px solid rgba(0,224,255,.3); background:rgba(0,224,255,.08); transition:transform .05s, background .1s; }
+  .key2:active{ transform:scale(.9); background:rgba(0,224,255,.28); }
+  .key2.del{ flex:1.4 1 0; color:#ffd23f; border-color:rgba(255,210,63,.45); background:rgba(255,210,63,.1); }
+  .slots{ display:flex; gap:14px; justify-content:center; margin:4px 0; }
+  .slot{ width:50px; height:60px; display:grid; place-items:center; font-size:32px; font-weight:900;
+    border-radius:12px; border:2px solid #2b3566; background:rgba(8,12,30,.6); color:#fff; }
+  .slot.active{ border-color:#ff3b6b; box-shadow:0 0 20px rgba(255,59,107,.5); }
+  .who{ font-size:clamp(20px,7vw,30px); font-weight:900; letter-spacing:2px; color:#9fe6ff; }
+  .who.p1{ color:#37ffb0; } .who.p2{ color:#ff7fae; }
+  /* scoreboard list */
+  .board{ width:min(94vw,420px); list-style:none; margin:6px 0; padding:0; max-height:46vh; overflow-y:auto; }
+  .board li{ display:flex; justify-content:space-between; gap:12px; padding:7px 12px; border-radius:10px; font-weight:800;
+    font-variant-numeric:tabular-nums; }
+  .board li:nth-child(odd){ background:rgba(255,255,255,.05); }
+  .board li .rk{ color:#9fe6ff; } .board li .sc{ color:#ffd23f; }
+  .board li.me{ background:rgba(255,210,63,.16); border:1px solid #ffd23f; }
+  .res-row{ display:flex; gap:14px; justify-content:center; align-items:stretch; margin:6px 0; }
+  .res-card{ flex:1 1 0; max-width:160px; padding:12px 10px; border-radius:14px; background:rgba(8,12,30,.6); border:2px solid #2b3566; }
+  .res-card.win{ border-color:#ffd23f; box-shadow:0 0 22px rgba(255,210,63,.4); }
+  .res-card .rn{ font-size:16px; font-weight:900; letter-spacing:1px; }
+  .res-card .rs{ font-size:clamp(20px,6vw,26px); font-weight:900; color:#ffd23f; }
+  .winner{ color:#ffd23f; font-size:clamp(20px,6.5vw,30px); font-weight:900; letter-spacing:1px; }
   #mute{ position:absolute; top:max(8px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
     pointer-events:auto; background:rgba(8,12,30,.6); border:2px solid #2b3566; color:#cdd6ff;
     border-radius:10px; font-size:13px; font-weight:700; padding:6px 12px; cursor:pointer; letter-spacing:1px; }
@@ -87,35 +114,76 @@
   </div>
 
   <div id="pad" class="hidden">
-    <button class="dbtn throw" id="btnThrow" aria-label="throw chicken">THROW</button>
+    <button class="dbtn mini throw" id="btnThrow" aria-label="throw chicken">THROW</button>
     <button class="dbtn" id="btnLeft" aria-label="left">&#9664;</button>
-    <button class="dbtn jump" id="btnJump" aria-label="jump">JUMP</button>
+    <button class="dbtn mini jump" id="btnJump" aria-label="jump">JUMP</button>
     <button class="dbtn" id="btnRight" aria-label="right">&#9654;</button>
+    <button class="dbtn mini chuckall" id="btnChuckAll" aria-label="chuck all and cash out">CHUCK<br>ALL</button>
   </div>
 
   <button id="mute" class="hidden">&#128266; SOUND</button>
 
   <div id="scrTitle" class="layer">
-    <h1 class="title pixfont">CHICKEN<br>RESCUE</h1>
-    <p class="tagline pixfont">save the chickens on the river!</p>
+    <h1 class="title pixfont">CHUCK A<br>CHICKEN</h1>
+    <p class="tagline pixfont">rescue &middot; chuck &middot; cash out!</p>
     <div class="card">
-      <span class="chick"><b>Rescue the chickens</b> floating down the river</span> &mdash; steer into them for big points!
-      <b>Dodge</b> rocks, logs &amp; buoys (they cost a life). Grab eggs &amp; hotdogs for bonus.
+      Steer the river and <b>rescue chickens</b> for big points. <b>Dodge</b> rocks, logs &amp; buoys.
       <br><br>
-      <b>&#9664; / &#9654;</b> steer &middot; <b>JUMP</b> (&#9650; / Space) hops ramps &amp; clears obstacles.
-      <br>Watch the sky &mdash; <b>THROW</b> a rescued chicken (F) to knock out diving <b>hawks!</b> 3 lives.
+      <b>&#9664;/&#9654;</b> steer &middot; <b>JUMP</b> (&#9650;/Space) &middot; <b>THROW</b> (F) a chicken at diving <b>hawks</b> &middot;
+      <b>CHUCK ALL</b> to capsize &amp; cash out for <b>$1,000,000!</b> 5 lives.
     </div>
-    <button class="btn" id="btnStart">START</button>
+    <button class="btn" id="btnStart">PLAY</button>
+    <button class="btn alt" id="btnBoard">SCOREBOARD</button>
     <p class="small pixfont">a Sass Attack joint</p>
   </div>
 
-  <div id="scrOver" class="layer hidden">
-    <h1 class="title pixfont" style="font-size:clamp(34px,12vw,64px)">GAME&nbsp;OVER</h1>
-    <p id="goScore" class="pixfont">$0</p>
-    <p id="goRescued" class="pixfont">0 chickens rescued</p>
-    <p id="goBest" class="pixfont">BEST $0</p>
-    <button class="btn alt" id="btnAgain">RUN AGAIN</button>
-    <p class="small pixfont">local high score only &mdash; for now</p>
+  <div id="scrPlayers" class="layer hidden">
+    <h1 class="title pixfont" style="font-size:clamp(30px,10vw,56px)">PLAYERS?</h1>
+    <p class="tagline pixfont">2-player is hot-seat &mdash; take turns</p>
+    <button class="btn" id="btn1p">1 PLAYER</button>
+    <button class="btn alt" id="btn2p">2 PLAYERS</button>
+    <button class="btn" id="btnPlayersBack" style="background:#2b3566;color:#cdd6ff;box-shadow:none;">BACK</button>
+  </div>
+
+  <div id="scrInitials" class="layer hidden">
+    <div class="who p1" id="iniWho">PLAYER 1 &mdash; INITIALS</div>
+    <p class="tagline pixfont">tap to enter 3 letters</p>
+    <div class="slots"><div class="slot" id="s0">A</div><div class="slot" id="s1">A</div><div class="slot" id="s2">A</div></div>
+    <div class="kbd" id="keyboard" aria-label="On-screen keyboard"></div>
+    <button class="btn" id="btnIniNext">LOCK IT IN</button>
+  </div>
+
+  <div id="scrPass" class="layer hidden">
+    <p class="tagline pixfont">player one is done!</p>
+    <div class="who p2" id="passWho">PASS TO PLAYER 2</div>
+    <div class="card" id="passMsg"></div>
+    <button class="btn alt" id="btnReady">I&rsquo;M READY</button>
+  </div>
+
+  <div id="scrResults" class="layer hidden">
+    <h1 class="title pixfont" id="resTitle" style="font-size:clamp(30px,10vw,56px)">RESULTS</h1>
+    <div id="res1p" class="hidden">
+      <p id="goScore" class="pixfont" style="font-size:clamp(40px,13vw,68px);margin:0;color:#fff;">$0</p>
+      <p id="goRescued" class="pixfont" style="margin:0;color:#ffd23f;">0 chickens rescued</p>
+      <p id="goBest" class="pixfont" style="margin:2px 0;color:#9fe6ff;font-size:16px;">BEST $0</p>
+    </div>
+    <div id="res2p" class="hidden">
+      <p class="winner pixfont" id="resWinner">&nbsp;</p>
+      <div class="res-row">
+        <div class="res-card" id="resC0"><div class="rn" id="resN0">P1</div><div class="rs" id="resS0">$0</div></div>
+        <div class="res-card" id="resC1"><div class="rn" id="resN1">P2</div><div class="rs" id="resS1">$0</div></div>
+      </div>
+    </div>
+    <button class="btn" id="btnAgain">PLAY AGAIN</button>
+    <button class="btn alt" id="btnBoardR">SCOREBOARD</button>
+    <p class="small pixfont" id="resPosted">scores posted to the leaderboard</p>
+  </div>
+
+  <div id="scrBoard" class="layer hidden">
+    <h1 class="title pixfont" style="font-size:clamp(28px,9vw,52px)">SCOREBOARD</h1>
+    <p class="tagline pixfont">Chuck a Chicken &mdash; top 10</p>
+    <ol class="board" id="boardList"><li><span class="rk">&hellip;</span><span class="sc">loading</span></li></ol>
+    <button class="btn" id="btnBoardBack">BACK</button>
   </div>
 </div>
 
@@ -181,6 +249,10 @@
     const land     = () => { noise(0.16,0.22,0,700); tone(240,0.12,'sine',0.10,110); };
     const turn     = () => tone(540,0.09,'triangle',0.05,660);
     const ramp     = () => arp([420,640,940],0.05,0.12,'square',0.15);
+    const select   = () => tone(620,0.05,'square',0.08);                       // keyboard blip
+    const jackpot  = () => { arp([523,659,784,1046,1318,1568,2093],0.07,0.55,'square',0.16);  // big cash-out fanfare
+                             [0,0.2,0.4].forEach(d=>{ tone(1046,0.45,'sine',0.10,null,d); tone(1568,0.45,'triangle',0.07,null,d); });
+                             noise(0.5,0.12,0,3200); };
     const throwfx  = () => { noise(0.13,0.16,0,2600); tone(320,0.14,'square',0.10,950); };                 // chicken whoosh
     const screech  = () => { tone(1500,0.16,'sawtooth',0.10,2300); tone(2100,0.12,'sawtooth',0.07,1500,0.05); }; // raptor screech
     const hawkHit  = () => { noise(0.18,0.22,0,1200); tone(520,0.16,'square',0.13,180); arp([900,640,440],0.05,0.12,'triangle',0.10); };
@@ -248,7 +320,7 @@
     function setMuted(m){ muted=m; try{ localStorage.setItem('boat_muted', m?'1':'0'); }catch(e){} if(master) master.gain.value=m?0:0.9; }
     return { ensure, resume, isMuted:()=>muted, setMuted,
              pickup, bonus, hit, lifeLost, start, over, jump, land, turn, ramp, cluck, rescue,
-             chickpick, throwfx, screech, hawkHit, startBed, stopBed };
+             chickpick, throwfx, screech, hawkHit, select, jackpot, startBed, stopBed };
   })();
 
   /* ===== 16-bit PALETTE + SPRITES (chunky pixel-art, integer-scaled buffer) ===== */
@@ -536,8 +608,28 @@
   function xAt(xRel, t){ return cxAt(t) + xRel*halfW(t); }
   const SB = 3;                 // boat block scale (16-bit chunky)
 
+  /* ===== online leaderboard (game id 'boat') =====
+     BACKEND: 'boat' must be enabled in config.php clean_game() + seeded in the highscore table
+     (see report). Until then the server falls back to the 'new' board for 'boat'. */
+  const SCORES_ENDPOINT = 'https://api.sassybreakfa.st/log/leaderboard.php';
+  const SCORE_ENDPOINT  = 'https://api.sassybreakfa.st/log/hscore.php';
+  const SCORE_TOKEN     = 'thesasshastheass';
+  const GAME            = 'boat';
+  function fetchT(url, opts={}, ms=3500){
+    const c=new AbortController(); const t=setTimeout(()=>c.abort(),ms);
+    return fetch(url,{...opts, signal:c.signal}).finally(()=>clearTimeout(t));
+  }
+  async function postScore(score, ini){          // fire-and-forget; never blocks the UI
+    const h={'Content-Type':'application/json','X-Score-Token':SCORE_TOKEN};
+    const runId=Date.now().toString(36)+Math.random().toString(36).slice(2,10);
+    try{ await fetchT(SCORES_ENDPOINT,{method:'POST',headers:h,
+      body:JSON.stringify({ score:Math.round(score), initials:ini, run_id:runId, mode:'', game:GAME })}); }catch(e){}
+    try{ await fetchT(SCORE_ENDPOINT,{method:'POST',headers:h,
+      body:JSON.stringify({ score:Math.round(score), initials:ini, game:GAME })}); }catch(e){}
+  }
+
   /* ===== state ===== */
-  const G = { state:'title', score:0, dist:0, best:0, lives:3, rescued:0,
+  const G = { state:'title', score:0, dist:0, best:0, lives:5, rescued:0, cap:null, lastCapsize:false,
               boatX:0, vx:0, inv:0, items:[], pops:[], hawks:[], projectiles:[],
               spawnT:0, hawkT:0, throwCool:0, speed:0, t:0, shake:0, cluckT:5,
               curve:0, curveTarget:0, curveTimer:0, curveEase:0.8,
@@ -571,8 +663,45 @@
     AudioFX.throwfx();
   }
 
+  // ===== CAPSIZE JACKPOT: chuck ALL rescued chickens, capsize, +$1,000,000, end the run =====
+  function doCapsize(){
+    if(G.state!=='play') return;
+    if(G.rescued<=0){ AudioFX.turn(); return; }     // soft nope -> need >=1 rescued chicken
+    G.state='capsize'; G.lastCapsize=true; G.score += 1000000;   // the cash-out prize
+    AudioFX.jackpot();
+    const bx0=xAt(G.boatX,0.9), by0=yAt(0.9)-30;
+    G.cap={ t:0, dur:2.2, roll:0, sink:0, parts:[] };
+    const nC=Math.min(28, Math.max(4, G.rescued));
+    for(let i=0;i<nC;i++){ const a=-Math.PI/2+(Math.random()-0.5)*2.4, sp=130+Math.random()*230;
+      G.cap.parts.push({ x:bx0+(Math.random()-0.5)*40, y:by0, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-70, rot:Math.random()*6, vr:(Math.random()-0.5)*10, kind:'chick' }); }
+    for(let i=0;i<26;i++){ const a=-Math.PI/2+(Math.random()-0.5)*3, sp=80+Math.random()*200;
+      G.cap.parts.push({ x:bx0+(Math.random()-0.5)*60, y:by0, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-40, rot:0, vr:0, kind:'feather' }); }
+    G.rescued=0; updateHUD();
+  }
+  function updateCapsize(dt){
+    const c=G.cap; if(!c){ endRun(); return; }
+    waterPhase += dt*1.4;
+    c.t+=dt; c.roll=Math.min(1.45, c.roll+dt*1.6); c.sink=Math.min(46, c.sink+dt*24);
+    for(const p of c.parts){ p.vy+=380*dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.rot+=p.vr*dt; }
+    G.shake=0.2;
+    if(c.t>=c.dur) endRun();
+  }
+  function drawCapsize(){
+    const c=G.cap; if(!c) return;
+    const bx0=xAt(G.boatX,0.9), groundY=yAt(0.9)-12;
+    const k=Math.min(1,c.t/0.6);
+    bx.globalAlpha=Math.max(0,1-c.t/1.6); bx.strokeStyle='#dff4ff'; bx.lineWidth=4;
+    bx.beginPath(); bx.arc(bx0, groundY+18, 12+k*96, 0, Math.PI*2); bx.stroke(); bx.globalAlpha=1;
+    const tilt=1 - c.roll*0.5;                                    // roll -> taller/narrower then flip-ish
+    drawSprite(SPR_BOAT, bx0 + c.roll*22, groundY-8 + c.sink, SB*(2-tilt), SB*tilt);
+    for(const p of c.parts){
+      if(p.kind==='chick'){ const sp=1.0+0.25*Math.sin(p.rot); drawSprite(SPR_CHICKEN, p.x, p.y, 1.15*sp, 1.15/sp); }
+      else { bx.fillStyle='#fff8f0'; bx.fillRect(Math.round(p.x), Math.round(p.y), 3,3); }
+    }
+  }
+
   function reset(){
-    G.score=0; G.dist=0; G.lives=3; G.rescued=0; G.boatX=0; G.vx=0; G.inv=0;
+    G.score=0; G.dist=0; G.lives=5; G.rescued=0; G.boatX=0; G.vx=0; G.inv=0; G.cap=null; G.lastCapsize=false;
     G.items.length=0; G.pops.length=0; G.hawks.length=0; G.projectiles.length=0;
     G.spawnT=0.6; G.hawkT=6; G.throwCool=0; G.speed=0.34; G.t=0; G.shake=0; G.cluckT=4;
     G.curve=0; G.curveTarget=0; G.curveTimer=2.5; G.curveEase=0.8;
@@ -590,6 +719,7 @@
   }
 
   function update(dt){
+    if(G.state==='capsize'){ updateCapsize(dt); return; }
     G.t += dt;
     G.speed = 0.34 + Math.min(0.85, G.dist/2600);
     const spawnEvery = Math.max(0.42, 0.95 - G.dist/3200);
@@ -839,7 +969,10 @@
   }
   function render(){
     bx.clearRect(0,0,BASE_W,BASE_H);
-    drawWater(); drawItems(); drawHawks(); drawBoat(); drawProjectiles(); drawPops();
+    drawWater();
+    if(G.state==='capsize'){ drawCapsize(); }
+    else { drawItems(); drawHawks(); drawBoat(); drawProjectiles(); }
+    drawPops();
     let sx=offX, sy=offY;
     if(G.shake>0){ sx+=(Math.random()*2-1)*viewScale; sy+=(Math.random()*2-1)*viewScale; }
     sctx.fillStyle='#05060f'; sctx.fillRect(0,0,screen.width,screen.height);
@@ -867,26 +1000,111 @@
   function frame(ts){
     raf=requestAnimationFrame(frame);
     if(!last) last=ts; let dt=(ts-last)/1000; last=ts; if(dt>0.05) dt=0.05;
-    if(G.state==='play') update(dt);
+    if(G.state==='play'||G.state==='capsize') update(dt);
     render();
   }
 
+  /* ===== screen flow ===== */
+  const LAYERS=['scrTitle','scrPlayers','scrInitials','scrPass','scrResults','scrBoard'];
   function show(which){
-    $('scrTitle').classList.toggle('hidden', which!=='title');
-    $('scrOver').classList.toggle('hidden', which!=='over');
-    $('hud').classList.toggle('hidden', which!=='play');
-    $('pad').classList.toggle('hidden', which!=='play');
+    LAYERS.forEach(id=> $(id).classList.toggle('hidden', id!==which));
+    const playing=(which==='play');
+    $('hud').classList.toggle('hidden', !playing);
+    $('pad').classList.toggle('hidden', !playing);
     $('mute').classList.toggle('hidden', false);
   }
-  function startGame(){ AudioFX.ensure(); AudioFX.resume(); AudioFX.start(); goImmersive(); reset(); G.state='play'; show('play'); AudioFX.startBed(); }
-  function gameOver(){
-    G.state='over'; AudioFX.stopBed(); AudioFX.over();
-    if(G.score>G.best){ G.best=Math.floor(G.score); try{ localStorage.setItem('boat_best', String(G.best)); }catch(e){} }
-    $('goScore').textContent='$'+Math.floor(G.score).toLocaleString();
-    $('goRescued').textContent = G.rescued + (G.rescued===1?' chicken rescued':' chickens rescued');
-    $('goBest').textContent='BEST $'+Math.floor(G.best).toLocaleString();
-    show('over');
+
+  let players=[{ini:'AAA',score:0,rescued:0},{ini:'AAA',score:0,rescued:0}];
+  let mode=1, cur=0;
+
+  /* ----- INITIALS: custom on-screen QWERTY keyboard (no native OS keyboard) ----- */
+  let iniTarget=0, letters=['A','A','A'], pos=0;
+  const slotEls=[$('s0'),$('s1'),$('s2')];
+  function activeSlot(){ return Math.min(pos,2); }
+  function renderSlots(){ const a=activeSlot(); slotEls.forEach((s,i)=>{ s.textContent=letters[i]; s.classList.toggle('active', i===a); }); }
+  function typeChar(ch){ const c=String(ch).toUpperCase(); if(!/[A-Z0-9]/.test(c)) return; letters[activeSlot()]=c; pos=Math.min(pos+1,3); renderSlots(); }
+  function typeBackspace(){ pos=Math.max(pos-1,0); letters[activeSlot()]='A'; renderSlots(); }
+  function buildKeyboard(){
+    const kb=$('keyboard'); if(!kb||kb.dataset.built) return;
+    const rows=['QWERTYUIOP','ASDFGHJKL','ZXCVBNM','0123456789'];
+    rows.forEach((row,ri)=>{
+      const r=document.createElement('div'); r.className='kbd-row';
+      for(const ch of row){ const k=document.createElement('button'); k.type='button'; k.className='key2'; k.textContent=ch;
+        k.addEventListener('click',()=>{ AudioFX.ensure(); AudioFX.resume(); AudioFX.select(); typeChar(ch); }); r.appendChild(k); }
+      if(ri===2){ const del=document.createElement('button'); del.type='button'; del.className='key2 del'; del.innerHTML='&#9003;';
+        del.setAttribute('aria-label','Backspace'); del.addEventListener('click',()=>{ AudioFX.select(); typeBackspace(); }); r.appendChild(del); }
+      kb.appendChild(r);
+    });
+    kb.dataset.built='1';
   }
+  function openInitials(target){
+    iniTarget=target; letters=['A','A','A']; pos=0;
+    const who=$('iniWho'); who.textContent='PLAYER '+(target+1)+' \u2014 INITIALS'; who.className='who '+(target===0?'p1':'p2');
+    renderSlots(); show('scrInitials');
+  }
+  function lockInitials(){
+    const ini=letters.join('').toUpperCase().replace(/[^A-Z0-9]/g,'').padEnd(3,'A').slice(0,3);
+    players[iniTarget].ini=ini; AudioFX.select();
+    if(iniTarget===0 && mode===2){ openInitials(1); } else { beginRun(0); }
+  }
+
+  /* ----- run lifecycle ----- */
+  function chooseMode(m){ mode=m; AudioFX.ensure(); AudioFX.resume(); AudioFX.start(); openInitials(0); }
+  function beginRun(idx){
+    cur=idx; AudioFX.ensure(); AudioFX.resume(); goImmersive();
+    reset(); G.state='play'; show('play'); AudioFX.start(); AudioFX.startBed();
+  }
+  function gameOver(){ if(G.state!=='play') return; G.lastCapsize=false; endRun(); }
+  function endRun(){
+    G.state='over'; AudioFX.stopBed();
+    players[cur].score=Math.floor(G.score); players[cur].rescued=G.rescued;
+    if(G.score>G.best){ G.best=Math.floor(G.score); try{ localStorage.setItem('boat_best', String(G.best)); }catch(e){} }
+    postScore(players[cur].score, players[cur].ini);          // online leaderboard (game='boat')
+    if(mode===2 && cur===0){ showPass(); } else { showResults(); }
+  }
+  function showPass(){
+    $('passWho').textContent='PASS TO PLAYER 2';
+    $('passMsg').innerHTML='<b>'+players[0].ini+'</b> banked <b>$'+players[0].score.toLocaleString()+'</b>. Hand the boat to player 2!';
+    AudioFX.over(); show('scrPass');
+  }
+  function showResults(){
+    AudioFX.over();
+    if(mode===1){
+      $('res1p').classList.remove('hidden'); $('res2p').classList.add('hidden');
+      $('resTitle').textContent = G.lastCapsize ? 'CASHED OUT!' : 'GAME OVER';
+      $('goScore').textContent='$'+players[0].score.toLocaleString();
+      $('goRescued').textContent = players[0].rescued + (players[0].rescued===1?' chicken rescued':' chickens rescued');
+      $('goBest').textContent='BEST $'+Math.floor(G.best).toLocaleString();
+    } else {
+      $('res1p').classList.add('hidden'); $('res2p').classList.remove('hidden');
+      $('resTitle').textContent='RESULTS';
+      $('resN0').textContent=players[0].ini; $('resS0').textContent='$'+players[0].score.toLocaleString();
+      $('resN1').textContent=players[1].ini; $('resS1').textContent='$'+players[1].score.toLocaleString();
+      const w = players[0].score===players[1].score ? -1 : (players[0].score>players[1].score?0:1);
+      $('resC0').classList.toggle('win', w===0); $('resC1').classList.toggle('win', w===1);
+      $('resWinner').textContent = w<0 ? 'IT\u2019S A TIE!' : (players[w].ini+' WINS!');
+    }
+    show('scrResults');
+  }
+
+  /* ----- online scoreboard view (top 10, dollars) ----- */
+  let boardReturn='scrTitle';
+  async function loadBoard(){
+    const el=$('boardList'); el.innerHTML='<li><span class="rk">&hellip;</span><span class="sc">loading</span></li>';
+    try{
+      const r=await fetchT(SCORES_ENDPOINT+'?game='+GAME,{},3500); if(!r.ok) throw 0;
+      const d=await r.json(); const top=Array.isArray(d.top)?d.top.slice(0,10):[];
+      el.innerHTML='';
+      if(!top.length){ el.innerHTML='<li><span class="rk">&mdash;</span><span class="sc">no scores yet</span></li>'; return; }
+      top.forEach((row,i)=>{
+        const li=document.createElement('li');
+        const ini=(row.initials||'---').toUpperCase().slice(0,3);
+        li.innerHTML='<span class="rk">'+(i+1)+'. '+ini+'</span><span class="sc">$'+Number(row.score||0).toLocaleString()+'</span>';
+        el.appendChild(li);
+      });
+    }catch(e){ el.innerHTML='<li><span class="rk">&mdash;</span><span class="sc">couldn\u2019t load</span></li>'; }
+  }
+  function openBoard(from){ boardReturn=from; show('scrBoard'); loadBoard(); }
 
   /* ===== input ===== */
   function bindHold(btn, side){
@@ -896,37 +1114,56 @@
     btn.addEventListener('pointerleave',off); btn.addEventListener('pointercancel',off);
     btn.addEventListener('touchstart',on,{passive:false}); btn.addEventListener('touchend',off,{passive:false});
   }
+  function bindPress(btn, fn){
+    const on=e=>{ e.preventDefault(); AudioFX.ensure(); AudioFX.resume(); fn(); };
+    btn.addEventListener('pointerdown',on); btn.addEventListener('touchstart',on,{passive:false});
+  }
   bindHold($('btnLeft'),'left'); bindHold($('btnRight'),'right');
-  (function bindJump(){ const b=$('btnJump');
-    const on=e=>{ e.preventDefault(); AudioFX.ensure(); AudioFX.resume(); doJump(); };
-    b.addEventListener('pointerdown',on); b.addEventListener('touchstart',on,{passive:false});
-  })();
-  (function bindThrow(){ const b=$('btnThrow');
-    const on=e=>{ e.preventDefault(); AudioFX.ensure(); AudioFX.resume(); doThrow(); };
-    b.addEventListener('pointerdown',on); b.addEventListener('touchstart',on,{passive:false});
-  })();
+  bindPress($('btnJump'), doJump);
+  bindPress($('btnThrow'), doThrow);
+  bindPress($('btnChuckAll'), doCapsize);
 
   window.addEventListener('keydown', e=>{
     if(e.key===' '||e.key==='ArrowUp'||e.key==='ArrowDown') e.preventDefault();
-    if(e.key==='ArrowLeft'||e.key==='a'){ held.left=true; }
-    else if(e.key==='ArrowRight'||e.key==='d'){ held.right=true; }
-    else if(e.key==='ArrowUp'||e.key==='w'){ doJump(); }
-    else if(e.key==='f'||e.key==='F'||e.key==='Shift'){ doThrow(); }
-    else if(e.key===' '||e.key==='Enter'){ if(G.state==='play') doJump(); else if(G.state==='title'||G.state==='over') startGame(); }
+    if(G.state==='play'){
+      if(e.key==='ArrowLeft'||e.key==='a'){ held.left=true; }
+      else if(e.key==='ArrowRight'||e.key==='d'){ held.right=true; }
+      else if(e.key==='ArrowUp'||e.key==='w'||e.key===' '){ doJump(); }
+      else if(e.key==='f'||e.key==='F'||e.key==='Shift'){ doThrow(); }
+      else if(e.key==='c'||e.key==='C'){ doCapsize(); }
+    }
   });
   window.addEventListener('keyup', e=>{
     if(e.key==='ArrowLeft'||e.key==='a') held.left=false; else if(e.key==='ArrowRight'||e.key==='d') held.right=false;
   });
+  // desktop physical typing for the initials screen (no focused field -> no OS keyboard)
+  document.addEventListener('keydown', e=>{
+    if($('scrInitials').classList.contains('hidden')) return;
+    if(e.key==='Enter'){ e.preventDefault(); lockInitials(); }
+    else if(e.key==='Backspace'){ e.preventDefault(); typeBackspace(); }
+    else if(e.key.length===1 && /[A-Za-z0-9]/.test(e.key)){ e.preventDefault(); AudioFX.select(); typeChar(e.key); }
+  });
 
-  $('btnStart').addEventListener('click', startGame);
-  $('btnAgain').addEventListener('click', startGame);
+  // menu buttons
+  $('btnStart').addEventListener('click', ()=>{ AudioFX.ensure(); AudioFX.resume(); AudioFX.select(); show('scrPlayers'); });
+  $('btnBoard').addEventListener('click', ()=>{ AudioFX.ensure(); AudioFX.resume(); openBoard('scrTitle'); });
+  $('btn1p').addEventListener('click', ()=> chooseMode(1));
+  $('btn2p').addEventListener('click', ()=> chooseMode(2));
+  $('btnPlayersBack').addEventListener('click', ()=> show('scrTitle'));
+  $('btnIniNext').addEventListener('click', lockInitials);
+  $('btnReady').addEventListener('click', ()=> beginRun(1));
+  $('btnAgain').addEventListener('click', ()=> show('scrPlayers'));
+  $('btnBoardR').addEventListener('click', ()=> openBoard('scrResults'));
+  $('btnBoardBack').addEventListener('click', ()=> show(boardReturn));
+
   const muteBtn=$('mute');
   function paintMute(){ muteBtn.innerHTML = AudioFX.isMuted() ? '&#128263; MUTED' : '&#128266; SOUND'; }
   muteBtn.addEventListener('click', ()=>{ AudioFX.setMuted(!AudioFX.isMuted()); paintMute(); AudioFX.ensure(); AudioFX.resume(); });
   paintMute();
   ['pointerdown','touchstart','keydown'].forEach(ev=> document.addEventListener(ev, ()=>{ AudioFX.ensure(); AudioFX.resume(); }, {passive:true}));
 
-  show('title'); updateHUD(); raf=requestAnimationFrame(frame);
+  buildKeyboard();
+  show('scrTitle'); updateHUD(); raf=requestAnimationFrame(frame);
 })();
 
 </script>

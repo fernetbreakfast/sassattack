@@ -41,6 +41,14 @@
   .btn:active{ transform:translateY(2px) scale(.98); }
   .btn.alt{ background:linear-gradient(90deg,#ff3b6b,#ffd23f); color:#1a0008; box-shadow:0 8px 24px rgba(255,59,107,.4); }
   .small{ color:#8b93c0; font-size:12px; }
+  /* always-visible save-status banner (fixed at top so it can't be clipped by the centered results layer) */
+  #saveStatus{ position:fixed; top:max(10px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
+    z-index:90; max-width:92vw; padding:9px 16px; border-radius:12px; font-family:inherit; font-weight:900;
+    font-size:15px; letter-spacing:.5px; text-align:center; color:#05060f; background:#9fe6ff;
+    box-shadow:0 6px 20px rgba(0,0,0,.55); border:2px solid rgba(255,255,255,.45); pointer-events:none; }
+  #saveStatus.wait{ background:#ffd23f; }
+  #saveStatus.ok{ background:#37ffb0; }
+  #saveStatus.err{ background:#ff6b6b; color:#1a0008; }
   #goScore{ font-size:clamp(40px,13vw,68px); margin:0; color:#fff; }
   #goRescued{ margin:0; color:#ffd23f; font-size:clamp(16px,5vw,22px); }
   #goBest{ margin:0; color:#9fe6ff; font-size:16px; }
@@ -152,6 +160,8 @@
 <body>
 <div id="wrap">
   <canvas id="screen"></canvas>
+
+  <div id="saveStatus" class="hidden"></div>
 
   <div id="hud" class="hidden">
     <div id="hudLeft">
@@ -786,12 +796,17 @@
       body:JSON.stringify({ score:Math.round(score), initials:ini, game })}); }catch(e){}
   }
   function postScore(score, ini){ return postScoreTo(GAME, score, ini); }   // boat board (unchanged behavior)
-  // VISIBLE save status (diagnostic): paint the leaderboard.php POST's ACTUAL result onto the results screen.
+  // VISIBLE save status. Painted onto a FIXED top banner (#saveStatus) that can't be clipped by the
+  // centered results layer, plus the legacy #resPosted line. (#resPosted is the last child of an
+  // overflow-clipped, vertically-centered .layer, so on phone-height screens it was being pushed
+  // off-screen — which is why the save status "never appeared".)
   function setSaveStatus(text, kind){
-    const el=$('resPosted'); if(!el) return;
-    el.textContent=text;
-    el.style.color = kind==='ok' ? '#37ffb0' : (kind==='err' ? '#ff7a7a' : '#8b93c0');
+    const b=$('saveStatus');
+    if(b){ b.textContent=text; b.classList.remove('hidden','ok','err','wait'); if(kind) b.classList.add(kind); }
+    const el=$('resPosted');
+    if(el){ el.textContent=text; el.style.color = kind==='ok' ? '#37ffb0' : (kind==='err' ? '#ff7a7a' : '#9fe6ff'); }
   }
+  function hideSaveStatus(){ const b=$('saveStatus'); if(b) b.classList.add('hidden'); }
   // Save the BOAT score to the leaderboard table and report the real outcome (HTTP status / network error).
   async function saveBoatScore(score, ini){
     setSaveStatus('saving score…','wait');
@@ -1436,6 +1451,7 @@
   function chooseMode(m){ mode=m; AudioFX.ensure(); AudioFX.resume(); AudioFX.start(); openInitials(0); }
   function beginRun(idx){
     cur=idx; AudioFX.ensure(); AudioFX.resume(); goImmersive();
+    hideSaveStatus();                                  // clear last run's save banner before gameplay
     reset(); G.state='play'; show('play'); AudioFX.start(); AudioFX.startBed();
   }
   function gameOver(){ if(G.state!=='play') return; G.lastCapsize=false; endRun(); }
@@ -1451,9 +1467,12 @@
   // record the final score (incl. any bonus), post to the boat board, then continue the normal flow
   function finalizeRun(){
     players[cur].score=Math.floor(G.score); players[cur].rescued=G.rescued;
+    // POST FIRST, guarded — so the score always saves + the status always shows even if results render throws
+    try{ saveBoatScore(players[cur].score, players[cur].ini); }
+    catch(e){ console.error('[boat] saveBoatScore threw:', e); setSaveStatus('⚠ save error: '+(e&&e.message||'unknown'),'err'); }
     if(G.score>G.best){ G.best=Math.floor(G.score); try{ localStorage.setItem('boat_best', String(G.best)); }catch(e){} }
-    saveBoatScore(players[cur].score, players[cur].ini);      // online leaderboard (game='boat') + VISIBLE save status
-    if(mode===2 && cur===0){ showPass(); } else { showResults(); }
+    try{ if(mode===2 && cur===0){ showPass(); } else { showResults(); } }
+    catch(e){ console.error('[boat] results render threw:', e); }
   }
   function showPass(){
     $('passWho').textContent='PASS TO PLAYER 2';
@@ -1630,7 +1649,7 @@
   }
   // FREE BYE: forgo the goal cash and get a free continue -> full lives, brief invuln, back into the run.
   function freeBye(){
-    AudioFX.select();
+    AudioFX.select(); hideSaveStatus();
     G.lives=5; G.inv=2.5; G.shake=0;                   // revive with full lives + a safety window
     G.cap=null; G.lastCapsize=false;                   // un-sink if they'd capsized
     G.hawks.length=0; G.projectiles.length=0; G.items.length=0;   // clear hazards so they don't die on revive

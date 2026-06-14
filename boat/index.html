@@ -140,7 +140,7 @@
       Steer the river and <b>rescue chickens</b> for big points. <b>Dodge</b> rocks, logs &amp; buoys.
       <br><br>
       <b>&#9664;/&#9654;</b> steer &middot; <b>JUMP</b> (&#9650;/Space) &middot; <b>THROW</b> (F) a chicken at diving <b>hawks</b> &middot;
-      <b>CHUCK ALL</b> to capsize &amp; cash out for <b>$1,000,000!</b> 5 lives.
+      <b>CHUCK ALL</b> to capsize &amp; cash out for <b>$10,000,000!</b> 5 lives.
     </div>
     <button class="btn" id="btnStart">PLAY</button>
     <button class="btn alt" id="btnBoard">SCOREBOARD</button>
@@ -204,8 +204,8 @@
       <p><span class="tag">DRIVE</span> Tap <b>&#9664;</b> and <b>&#9654;</b> to steer the boat. Rocks, logs and buoys are not your friends &mdash; kiss one and it costs you <b>a whole life</b>. Yes, they&rsquo;re big. Yes, you&rsquo;ll still hit them.</p>
       <p><span class="tag">RESCUE</span> Scoop up every <span class="chick">chicken</span> bobbing in the river. Each feathery little nugget is worth <b>$1,000,000</b>. That is a million dollars. Per chicken. Try not to drool on the controls.</p>
       <p><span class="tag warn">HAWKS</span> Jerks with wings will <b>dive at you from the sky</b>. Smack one with the <b>THROW</b> button to launch a chicken at it&hellip; but heads up, genius: that chicken you chuck was worth <b>&minus;$1,000,000</b>. So every hawk you splat costs you a cool million. Dodge or pay up. Your call, big spender.</p>
-      <p><span class="tag">JUMP</span> Hit <b>JUMP</b> (or &#9650;/Space) to hop over trouble. Find a <b>ramp</b> and you&rsquo;ll launch way higher &mdash; very cool, very show-off, please don&rsquo;t miss the landing.</p>
-      <p><span class="tag warn">CHUCK ALL</span> The big finale: <b>CHUCK ALL</b> dumps every chicken you&rsquo;re hoarding, capsizes the boat, and cashes you out for a flat <b>$1,000,000 jackpot</b>&hellip; and then your run is <b>over</b>. Glorious. Dramatic. Done. Use it when you&rsquo;re feeling brave (or about to die anyway).</p>
+      <p><span class="tag">JUMP</span> Hit <b>JUMP</b> (or &#9650;/Space) to hop over trouble. Find a <b>ramp</b> and you&rsquo;ll launch way higher &mdash; and a trail of <b>money bags</b> (<b>+$250,000</b> each) appears in the air. Steer into them while you&rsquo;re flying to grab the loot. Very cool, very show-off, please don&rsquo;t miss the landing.</p>
+      <p><span class="tag warn">CHUCK ALL</span> The big finale: <b>CHUCK ALL</b> dumps every chicken you&rsquo;re hoarding, capsizes the boat in a glorious sinking spectacle, and cashes you out for a flat <b>$10,000,000 jackpot</b>&hellip; and then your run is <b>over</b>. Yes, the boat goes down with all hands. Tragic. Lucrative. Use it when you&rsquo;re feeling brave (or about to die anyway).</p>
       <p><span class="tag">LIVES</span> You get <b>5 lives</b>. That&rsquo;s five. Not fifty. Spend them like they matter, because apparently nobody taught you that earlier.</p>
       <p><span class="tag">LOOT</span> Grab the random <b>bonus pickups</b> floating by for some extra pocket change. Won&rsquo;t make you a millionaire, but every little bit soothes the ego.</p>
       <p class="lead">That&rsquo;s it. Go rescue some chickens and try not to embarrass yourself out there. I believe in you. Mostly.</p>
@@ -281,6 +281,11 @@
                              [0,0.2,0.4].forEach(d=>{ tone(1046,0.45,'sine',0.10,null,d); tone(1568,0.45,'triangle',0.07,null,d); });
                              noise(0.5,0.12,0,3200); };
     const throwfx  = () => { noise(0.13,0.16,0,2600); tone(320,0.14,'square',0.10,950); };                 // chicken whoosh
+    // dramatic SINKING sting: big splash + descending foghorn-ish synth + glugging gurgle
+    const sink     = () => { noise(0.55,0.34,0,1700); noise(0.7,0.22,0.18,700);                            // splash + wash
+                             tone(240,1.7,'sawtooth',0.18,60); tone(120,1.9,'sine',0.13,42,0.06);          // foghorn down
+                             tone(360,1.3,'triangle',0.08,90,0.12);
+                             [0.45,0.75,1.05,1.35,1.65].forEach((d,i)=> tone(300-i*30,0.2,'sine',0.07,130,d)); }; // gurgles
     const screech  = () => { tone(1500,0.16,'sawtooth',0.10,2300); tone(2100,0.12,'sawtooth',0.07,1500,0.05); }; // raptor screech
     const hawkHit  = () => { noise(0.18,0.22,0,1200); tone(520,0.16,'square',0.13,180); arp([900,640,440],0.05,0.12,'triangle',0.10); };
     // chicken cluck: a short pitched chirp gliding down + a band-noise transient = "bok"
@@ -347,7 +352,7 @@
     function setMuted(m){ muted=m; try{ localStorage.setItem('boat_muted', m?'1':'0'); }catch(e){} if(master) master.gain.value=m?0:0.9; }
     return { ensure, resume, isMuted:()=>muted, setMuted,
              pickup, bonus, hit, lifeLost, start, over, jump, land, turn, ramp, cluck, rescue,
-             chickpick, throwfx, screech, hawkHit, select, jackpot, startBed, stopBed };
+             chickpick, throwfx, screech, hawkHit, select, jackpot, sink, startBed, stopBed };
   })();
 
   /* ===== 16-bit PALETTE + SPRITES (chunky pixel-art, integer-scaled buffer) ===== */
@@ -581,6 +586,23 @@
     "...vv....",
     "........."
   ];
+  // 16-bit money bag: tan sack, white tie, bold gold $ — caught in the air off ramp jumps
+  const SPR_MONEY = [
+    "..............",
+    ".....kkkk.....",
+    "....kwwwwk....",
+    "...kkLLLLkk...",
+    "..kLLLLLLLLk..",
+    ".kLLLLLLLLLLk.",
+    ".kLLLLgggLLLk.",
+    ".kLLLgLgLLLLk.",
+    ".kLLLLgggLLLk.",
+    ".kLLLLLgLgLLk.",
+    ".kLLLLgggLLLk.",
+    ".kLLLLLLLLLLk.",
+    "..kLLLLLLLLk..",
+    "...kkkkkkkk..."
+  ];
   // chunky 16-bit cloud (white body, light-blue underside shading) for the top-of-screen drift
   const SPR_CLOUD = [
     "................",
@@ -604,6 +626,8 @@
   const CHICKEN_VALUE = 1000000;   // +$1,000,000 per chicken RESCUED, -$1,000,000 per chicken THROWN
   const CHICKEN_PTS = CHICKEN_VALUE;
   const HAWK_PTS = 0;              // whacking a hawk saves a life — the reward is survival, not cash
+  const JACKPOT_VALUE = 10000000; // CHUCK ALL capsize cash-out: a flat $10,000,000 prize that ends the run
+  const MONEY_VALUE = 250000;     // each money bag caught off a ramp jump = +$250,000
 
   /* ===== buffer / scaling (16-bit: doubled internal resolution, integer-scaled blit) ===== */
   const screen = $('screen');
@@ -728,41 +752,94 @@
     AudioFX.throwfx();
   }
 
-  // ===== CAPSIZE JACKPOT: chuck ALL rescued chickens, capsize, +$1,000,000, end the run =====
+  // ===== CAPSIZE JACKPOT: chuck ALL rescued chickens, dramatic SINKING cutscene, +$10,000,000, end the run =====
   function doCapsize(){
     if(G.state!=='play') return;
     if(G.rescued<=0){ AudioFX.turn(); return; }     // soft nope -> need >=1 rescued chicken
-    G.state='capsize'; G.lastCapsize=true; G.score += 1000000;   // the cash-out prize
-    AudioFX.jackpot();
-    const bx0=xAt(G.boatX,0.9), by0=yAt(0.9)-30;
-    G.cap={ t:0, dur:2.2, roll:0, sink:0, parts:[] };
-    const nC=Math.min(28, Math.max(4, G.rescued));
-    for(let i=0;i<nC;i++){ const a=-Math.PI/2+(Math.random()-0.5)*2.4, sp=130+Math.random()*230;
-      G.cap.parts.push({ x:bx0+(Math.random()-0.5)*40, y:by0, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-70, rot:Math.random()*6, vr:(Math.random()-0.5)*10, kind:'chick' }); }
-    for(let i=0;i<26;i++){ const a=-Math.PI/2+(Math.random()-0.5)*3, sp=80+Math.random()*200;
+    G.state='capsize'; G.lastCapsize=true; G.score += JACKPOT_VALUE;   // the $10,000,000 cash-out prize
+    AudioFX.sink();                                  // dramatic descending foghorn + splash sting
+    const bx0=xAt(G.boatX,0.9), by0=yAt(0.9)-30, groundY=yAt(0.9)-12;
+    G.cap={ t:0, dur:4.2, roll:0, sink:0, waterRise:0, bubbleT:0, fanfare:false, parts:[], bubbles:[],
+            riders:[ { x:bx0-16, y:by0, vx:-46, vy:-120, ph:Math.random()*6, kind:'pink' },
+                     { x:bx0+16, y:by0, vx: 46, vy:-100, ph:Math.random()*6, kind:'hat'  } ] };
+    const nC=Math.min(30, Math.max(6, G.rescued));
+    for(let i=0;i<nC;i++){ const a=-Math.PI/2+(Math.random()-0.5)*2.4, sp=150+Math.random()*250;
+      G.cap.parts.push({ x:bx0+(Math.random()-0.5)*40, y:by0, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-90, rot:Math.random()*6, vr:(Math.random()-0.5)*10, kind:'chick' }); }
+    for(let i=0;i<30;i++){ const a=-Math.PI/2+(Math.random()-0.5)*3, sp=90+Math.random()*220;
       G.cap.parts.push({ x:bx0+(Math.random()-0.5)*60, y:by0, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp-40, rot:0, vr:0, kind:'feather' }); }
     G.rescued=0; updateHUD();
   }
   function updateCapsize(dt){
     const c=G.cap; if(!c){ endRun(); return; }
+    const groundY=yAt(0.9)-12, bx0=xAt(G.boatX,0.9);
     waterPhase += dt*1.4;
-    c.t+=dt; c.roll=Math.min(1.45, c.roll+dt*1.6); c.sink=Math.min(46, c.sink+dt*24);
-    for(const p of c.parts){ p.vy+=380*dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.rot+=p.vr*dt; }
-    G.shake=0.2;
+    c.t+=dt;
+    c.roll=Math.min(1.7, c.roll+dt*1.3);            // slow dramatic tilt
+    c.sink=Math.min(64, c.sink+dt*16);              // boat slips under
+    c.waterRise=Math.min(150, c.waterRise+dt*42);   // water creeps up and over the wreck
+    // scattered chickens + feathers arc out and fall
+    for(const p of c.parts){ p.vy+=360*dt; p.x+=p.vx*dt; p.y+=p.vy*dt; p.rot+=p.vr*dt; }
+    // panicked riders bob/flail at the rising surface
+    const surf=groundY - c.waterRise*0.55;
+    for(const rd of c.riders){ rd.vy+=300*dt; rd.vx*=0.985; rd.x+=rd.vx*dt; rd.y+=rd.vy*dt;
+      if(rd.y>surf){ rd.y=surf; rd.vy*=-0.32; } rd.ph+=dt*11; }
+    // glugging bubbles stream up from the going-under boat
+    c.bubbleT-=dt;
+    if(c.bubbleT<=0){ c.bubbleT=0.045;
+      for(let i=0;i<2;i++) c.bubbles.push({ x:bx0+(Math.random()-0.5)*46, y:groundY+6+c.sink*0.4,
+        vy:-(45+Math.random()*70), r:1.5+Math.random()*3.5, ph:Math.random()*6, life:1.0+Math.random()*0.9 }); }
+    for(const b of c.bubbles){ b.y+=b.vy*dt; b.x+=Math.sin(b.ph+c.t*6)*9*dt; b.life-=dt; }
+    if(c.bubbles.length>120) c.bubbles=c.bubbles.filter(b=>b.life>0);
+    G.shake=0.18+0.12*Math.max(0,1-c.t/1.2);        // strong shake up front, easing off
+    // kick the cash-register fanfare partway through the sink
+    if(!c.fanfare && c.t>2.0){ c.fanfare=true; AudioFX.jackpot(); }
     if(c.t>=c.dur) endRun();
+  }
+  function drawRider(x,y,kind,ph){
+    const flail=Math.sin(ph)*3, flail2=Math.cos(ph*1.3)*3;
+    bx.fillStyle='#ffd9a8';                                            // flailing arms
+    bx.fillRect(Math.round(x-6), Math.round(y-2-flail), 2,5);
+    bx.fillRect(Math.round(x+4), Math.round(y-2-flail2),2,5);
+    bx.fillStyle = kind==='pink' ? '#ff6fae' : '#e7ddcc';             // pink hair vs captain
+    bx.fillRect(Math.round(x-3), Math.round(y-3), 6,6);               // head
+    if(kind==='hat'){ bx.fillStyle='#2b3566'; bx.fillRect(Math.round(x-4),Math.round(y-5),8,2); bx.fillRect(Math.round(x-2),Math.round(y-7),4,2); }
+    else { bx.fillStyle='#ff9ecf'; bx.fillRect(Math.round(x-3),Math.round(y-4),6,2); }   // hair tuft
+    bx.fillStyle='#120a16'; bx.fillRect(Math.round(x-2),Math.round(y-1),1,1); bx.fillRect(Math.round(x+1),Math.round(y-1),1,1); // panicked eyes
   }
   function drawCapsize(){
     const c=G.cap; if(!c) return;
     const bx0=xAt(G.boatX,0.9), groundY=yAt(0.9)-12;
+    // initial splash ring
     const k=Math.min(1,c.t/0.6);
-    bx.globalAlpha=Math.max(0,1-c.t/1.6); bx.strokeStyle='#dff4ff'; bx.lineWidth=4;
-    bx.beginPath(); bx.arc(bx0, groundY+18, 12+k*96, 0, Math.PI*2); bx.stroke(); bx.globalAlpha=1;
-    const tilt=1 - c.roll*0.5;                                    // roll -> taller/narrower then flip-ish
-    drawSprite(SPR_BOAT, bx0 + c.roll*22, groundY-8 + c.sink, SB*(2-tilt), SB*tilt);
+    bx.globalAlpha=Math.max(0,1-c.t/1.4); bx.strokeStyle='#dff4ff'; bx.lineWidth=4;
+    bx.beginPath(); bx.arc(bx0, groundY+18, 14+k*110, 0, Math.PI*2); bx.stroke(); bx.globalAlpha=1;
+    // the doomed boat: tilting + sinking, with a slow dramatic "camera push" zoom
+    const tilt=1 - Math.min(0.85,c.roll*0.5);
+    const zoom=1 + Math.min(0.5, c.t*0.10);
+    drawSprite(SPR_BOAT, bx0 + c.roll*24, groundY-8 + c.sink, SB*(2-tilt)*zoom, SB*tilt*zoom);
+    // scattered chickens + feathers
     for(const p of c.parts){
-      if(p.kind==='chick'){ const sp=1.0+0.25*Math.sin(p.rot); drawSprite(SPR_CHICKEN, p.x, p.y, 1.15*sp, 1.15/sp); }
+      if(p.kind==='chick'){ const sp=1.0+0.25*Math.sin(p.rot); drawSprite(SPR_CHICKEN, p.x, p.y, 1.2*sp, 1.2/sp); }
       else { bx.fillStyle='#fff8f0'; bx.fillRect(Math.round(p.x), Math.round(p.y), 3,3); }
     }
+    // rising water swallowing the wreck (translucent) + wavy foam surface
+    const surfTop=groundY - c.waterRise;
+    bx.fillStyle='rgba(38,118,188,0.58)';
+    bx.fillRect(0, Math.round(surfTop), BASE_W, BASE_H-Math.round(surfTop));
+    bx.fillStyle='rgba(70,166,230,0.5)';
+    bx.fillRect(0, Math.round(surfTop), BASE_W, 6);
+    bx.fillStyle='#bfe6ff';
+    for(let x=0;x<BASE_W;x+=4){ const wy=surfTop+Math.sin(x*0.18+waterPhase*5)*2.5; bx.fillRect(x, Math.round(wy), 3, 2); }
+    // bubbles glugging up through/over the water
+    for(const b of c.bubbles){ bx.globalAlpha=Math.max(0,Math.min(0.75,b.life));
+      bx.strokeStyle='#dff4ff'; bx.lineWidth=1; bx.beginPath(); bx.arc(b.x,b.y,b.r,0,Math.PI*2); bx.stroke();
+      bx.fillStyle='rgba(223,244,255,0.5)'; bx.fillRect(Math.round(b.x-1),Math.round(b.y-1),1,1); }
+    bx.globalAlpha=1;
+    // panicked riders bobbing on the surface (drawn over the water)
+    for(const rd of c.riders) drawRider(rd.x, rd.y, rd.kind, rd.ph);
+    // dramatic fade-to-deep-blue in the final beat -> flows into the CASHED OUT! screen
+    if(c.t>c.dur-1.3){ const fa=Math.min(0.82,(c.t-(c.dur-1.3))/1.3*0.82);
+      bx.fillStyle='rgba(6,14,34,'+fa+')'; bx.fillRect(0,0,BASE_W,BASE_H); }
   }
 
   function reset(){
@@ -781,6 +858,18 @@
     else if(roll < 0.38){ G.items.push({ kind:'chicken', spr:SPR_CHICKEN, xRel, t:0, hw:9, big:true, gone:false }); }
     else if(roll < 0.58){ const p=PICKUPS[(Math.random()*PICKUPS.length)|0]; G.items.push({ kind:'pick', spr:p.spr, pts:p.pts, xRel, t:0, hw:7, gone:false }); }
     else { const o=OBSTACLES[(Math.random()*OBSTACLES.length)|0]; G.items.push({ kind:'obs', spr:o, xRel, t:0, hw: o===SPR_LOG?16:8, gone:false }); }
+  }
+
+  // RAMP MONEY: when the boat launches off a ramp, a catchable arc of money bags appears in the air.
+  // They're only grabbable while AIRBORNE (steer into them mid-jump) -> +$250,000 each.
+  function spawnRampMoney(){
+    const n=5, base=G.boatX;
+    for(let i=0;i<n;i++){
+      const frac=i/(n-1), arc=Math.sin(frac*Math.PI);              // 0..1..0 height arc across the run
+      let xr=base+(frac-0.5)*0.55; xr=Math.max(-0.7,Math.min(0.7,xr));
+      // start t tuned so the bags reach the catch zone (t~0.8-0.99) while the ramp jump is still in the air
+      G.items.push({ kind:'money', spr:SPR_MONEY, xRel:xr, t:0.46+i*0.05, hw:9, airPx:14+arc*18, gone:false });
+    }
   }
 
   function update(dt){
@@ -870,7 +959,11 @@
             it.hit=true; it.gone=true; G.score += it.pts; (it.pts>=100?AudioFX.bonus:AudioFX.pickup)();
           } else if(it.kind==='ramp'){
             it.hit=true; it.gone=true; G.score += 25;
-            if(!G.airborne){ G.airborne=true; G.jumpVel=JUMP_V0*1.18; G.jumpH=0.001; G.squashY=1.34; AudioFX.ramp(); }
+            if(!G.airborne){ G.airborne=true; G.jumpVel=JUMP_V0*1.18; G.jumpH=0.001; G.squashY=1.34; AudioFX.ramp(); spawnRampMoney(); }
+          } else if(it.kind==='money'){
+            if(G.airborne){ it.hit=true; it.gone=true; G.score += MONEY_VALUE; AudioFX.bonus();
+              G.pops.push({ x:xAt(it.xRel,it.t), y:yAt(it.t)-(it.airPx||16)*itemScale(it.t), age:0 }); }
+            // not airborne: it floats past harmlessly (NOT an obstacle)
           } else if(!G.airborne && G.inv<=0){
             it.hit=true; it.gone=true; G.lives--; G.inv=1.4; G.shake=0.35; AudioFX.hit();
             if(G.lives<=0){ gameOver(); return; } else AudioFX.lifeLost();
@@ -1000,11 +1093,15 @@
   function drawItems(){
     const arr=G.items.filter(i=>!i.gone).sort((a,b)=>a.t-b.t);
     for(const it of arr){
-      const y=yAt(it.t), x=xAt(it.xRel,it.t), sc=itemScale(it.t)*(it.big?1.15:1);
-      bx.fillStyle='rgba(8,20,40,0.25)';
+      const sc=itemScale(it.t)*(it.big?1.15:1);
+      const groundY=yAt(it.t), x=xAt(it.xRel,it.t);
+      const airOff = it.kind==='money' ? (it.airPx||16)*sc : 0;     // money bags hover up in the air
+      const y=groundY-airOff;
+      bx.fillStyle='rgba(8,20,40,0.25)';                            // shadow stays on the water so it reads as airborne
       const sw=it.spr[0].length*sc;
-      bx.fillRect(Math.round(x-sw/2), Math.round(y+it.spr.length*sc/2-1), Math.round(sw), 3);
-      drawSprite(it.spr, x, y, sc);
+      bx.fillRect(Math.round(x-sw/2), Math.round(groundY+it.spr.length*sc/2-1), Math.round(sw), 3);
+      if(airOff>0){ const bob=Math.sin(it.t*30+it.xRel*7)*2; drawSprite(it.spr, x, y+bob, sc); }
+      else drawSprite(it.spr, x, y, sc);
     }
   }
 
@@ -1171,12 +1268,14 @@
     AudioFX.over(); show('scrPass');
   }
   function showResults(){
-    AudioFX.over();
+    if(!G.lastCapsize) AudioFX.over();              // capsize already blasted the jackpot during the sink
     if(mode===1){
       $('res1p').classList.remove('hidden'); $('res2p').classList.add('hidden');
       $('resTitle').textContent = G.lastCapsize ? 'CASHED OUT!' : 'GAME OVER';
       $('goScore').textContent='$'+players[0].score.toLocaleString();
-      $('goRescued').textContent = players[0].rescued + (players[0].rescued===1?' chicken rescued':' chickens rescued');
+      $('goRescued').textContent = G.lastCapsize
+        ? '💰 +$10,000,000 CAPSIZE JACKPOT!'
+        : players[0].rescued + (players[0].rescued===1?' chicken rescued':' chickens rescued');
       $('goBest').textContent='BEST $'+Math.floor(G.best).toLocaleString();
     } else {
       $('res1p').classList.add('hidden'); $('res2p').classList.remove('hidden');

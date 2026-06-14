@@ -64,6 +64,10 @@
     color:#fff; font-size:48px; font-weight:900; display:flex; align-items:center; justify-content:center;
     backdrop-filter:blur(2px); transition:transform .06s, background .1s; }
   .dbtn:active{ background:rgba(0,224,255,.35); transform:scale(.96); }
+  .dbtn.jump{ width:clamp(74px,21vw,104px); height:clamp(74px,21vw,104px);
+    font-size:clamp(15px,4.6vw,20px); align-self:flex-end; margin-bottom:8px;
+    border-color:rgba(255,210,63,.6); background:rgba(60,42,8,.42); color:#ffd23f; letter-spacing:1px; }
+  .dbtn.jump:active{ background:rgba(255,210,63,.35); }
 
   /* ---- mute ---- */
   #mute{ position:absolute; top:max(8px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
@@ -81,9 +85,10 @@
     <div id="scoreWrap"><div id="score">$0</div><div id="best">BEST $0</div></div>
   </div>
 
-  <!-- touch d-pad -->
+  <!-- touch controls: steer + jump -->
   <div id="pad" class="hidden">
     <button class="dbtn" id="btnLeft" aria-label="left">&#9664;</button>
+    <button class="dbtn jump" id="btnJump" aria-label="jump">JUMP</button>
     <button class="dbtn" id="btnRight" aria-label="right">&#9654;</button>
   </div>
 
@@ -97,7 +102,7 @@
       Steer down the river. <b>Dodge</b> rocks, logs &amp; buoys.
       <b>Grab</b> eggs, hotdogs &amp; friends for points.
       <br><br>
-      <b>&#9664; / &#9654;</b> or arrow keys to steer. 3 lives. Go far.
+      <b>&#9664; / &#9654;</b> steer &middot; <b>JUMP</b> (or &#9650; / Space) to hop ramps &amp; clear obstacles. 3 lives.
     </div>
     <button class="btn" id="btnStart">START</button>
     <p class="small pixfont">a Sass Attack joint</p>
@@ -129,7 +134,7 @@
 
   /* =====================================================================
      AUDIO — everything synthesized via Web Audio (no audio files).
-     SFX: pickup chime / hit / life-lost / game-over / start.
+     SFX: pickup chime / hit / life-lost / game-over / start / jump / land / turn / ramp.
      Music: a light, loopable chiptune bed (paddling groove) while playing.
      Master mute toggle persisted in localStorage ('boat_muted').
      ===================================================================== */
@@ -185,6 +190,11 @@
     const start    = () => arp([523,659,784,1046], 0.07, 0.18, 'square', 0.16);
     const over     = () => { arp([330,262,196,131], 0.14, 0.34, 'triangle', 0.2);
                              tone(98,0.7,'sawtooth',0.12,70,0.2); };
+    // new-mechanic SFX
+    const jump     = () => { tone(300,0.16,'square',0.16,780); tone(540,0.12,'sine',0.07,1060,0.02); }; // rising boing/whoosh
+    const land     = () => { noise(0.16,0.22); tone(240,0.12,'sine',0.10,110); };                       // splash
+    const turn     = () => tone(540,0.09,'triangle',0.05,660);                                          // subtle bend cue
+    const ramp     = () => arp([420,640,940], 0.05, 0.12, 'square', 0.15);                              // ramp boost
 
     // --- background MUSIC: light chiptune paddling groove (loops) ---
     let musicGain=null, loopTimer=null, bedOn=false, nextAt=0;
@@ -237,7 +247,7 @@
       if(master) master.gain.value = m?0:0.9;
     }
     return { ensure, resume, isMuted:()=>muted, setMuted,
-             pickup, bonus, hit, lifeLost, start, over, startBed, stopBed };
+             pickup, bonus, hit, lifeLost, start, over, jump, land, turn, ramp, startBed, stopBed };
   })();
 
   /* =====================================================================
@@ -269,14 +279,14 @@
   const SPR_BOAT = [
     "................................",
     "..........kk........kk..........",
-    ".........kppk......khhk.........",
-    ".........kppk.....khhhhk........",
-    "........kpppk.....kxxxxk........",
-    "........ksssk.....kgsssk........",
-    ".......kssssk.....kssssk........",
-    "......kkbbbbkk...kknnnnkk.......",
-    ".....kbbbbbbbk...knnnnnnk.......",
-    ".....kbbbbbbbk...knnnnnnk.......",
+    ".........khhk......kppk.........",
+    "........khhhhk.....kppk.........",
+    "........kxxxxk.....kpppk........",
+    "........ksssgk.....ksssk........",
+    "........kssssk.....kssssk.......",
+    ".......kknnnnkk...kkbbbbkk......",
+    ".......knnnnnnk...kbbbbbbbk.....",
+    ".......knnnnnnk...kbbbbbbbk.....",
     "....kkkkkkkkkkkkkkkkkkkkkkk.....",
     "...kwwwwwwwwwwwwwwwwwwwwwwwwk...",
     "..kwWWwwwwwwwwwwwwwwwwwwwWWwwk..",
@@ -321,6 +331,17 @@
     ".kMMMMk.",
     "..kMMk..",
     "..ffff.."
+  ];
+  // launch ramp — telegraphed with cyan up-chevrons
+  const SPR_RAMP = [
+    "............",
+    ".....GG.....",
+    "....GGGG....",
+    "...kkOOkk...",
+    "..kOOOOOOk..",
+    ".kOOOOOOOOk.",
+    "kOOOOOOOOOOk",
+    "kkkkkkkkkkkk"
   ];
 
   // ---- pickups (callbacks to the other games) ----
@@ -445,10 +466,11 @@
   resize();
 
   // draw a sprite into the buffer at integer block-size `sc`, centered on (cx,cy)
-  function drawSprite(spr, cx, cy, sc){
-    sc = Math.max(1, Math.round(sc));
+  function drawSprite(spr, cx, cy, scx, scy){
+    scx = Math.max(0.5, scx); scy = Math.max(0.5, scy==null ? scx : scy);
     const h = spr.length, w = spr[0].length;
-    const x0 = Math.round(cx - (w*sc)/2), y0 = Math.round(cy - (h*sc)/2);
+    const x0 = cx - (w*scx)/2, y0 = cy - (h*scy)/2;
+    const bw = Math.ceil(scx), bh = Math.ceil(scy);
     for(let r=0;r<h;r++){
       const row = spr[r];
       for(let c=0;c<w;c++){
@@ -456,7 +478,7 @@
         if(ch==='.'){ continue; }
         const col = PAL[ch]; if(!col) continue;
         bx.fillStyle = col;
-        bx.fillRect(x0 + c*sc, y0 + r*sc, sc, sc);
+        bx.fillRect(Math.round(x0 + c*scx), Math.round(y0 + r*scy), bw, bh);
       }
     }
   }
@@ -468,30 +490,57 @@
   function yAt(t){ return HZ + (BASE_H+24 - HZ) * (t*t); }   // accelerate toward camera
   function halfW(t){ return TOPW + (BOTW-TOPW)*t; }
   function scaleAt(t){ return 0.45 + 2.0*t; }                // sprite grows as it nears
-  function xAt(xRel, t){ return CX + xRel*halfW(t); }
+  // ----- river bend: the channel centerline drifts horizontally. Strong at the horizon
+  // (so a bend is telegraphed well ahead) and gentle near the boat, so curves are fair. -----
+  const BEND_AMP = 22;
+  function bendPx(t){ return G.curve * BEND_AMP * (1 - 0.7*t); }
+  function cxAt(t){ return CX + bendPx(t); }
+  function xAt(xRel, t){ return cxAt(t) + xRel*halfW(t); }
 
   /* ===== game state ===== */
   const G = { state:'title', score:0, dist:0, best:0, lives:3,
-              boatX:0, vx:0, inv:0, items:[], spawnT:0, speed:0, t:0, shake:0 };
+              boatX:0, vx:0, inv:0, items:[], spawnT:0, speed:0, t:0, shake:0,
+              curve:0, curveTarget:0, curveTimer:0,
+              airborne:false, jumpH:0, jumpVel:0, squashY:1 };
   try{ G.best = parseInt(localStorage.getItem('boat_best')||'0',10)||0; }catch(e){}
 
   const held = { left:false, right:false };
   let waterPhase = 0;
 
+  // ----- steering feel (gentler than v1: lower accel/top speed + stronger damping) -----
+  const STEER_ACC = 0.6;        // was 3.4  — much gentler push
+  const STEER_MAX = 0.30;       // was 1.7  — lower top cross-river speed
+  const STEER_FRICTION = 0.80;  // was 0.86 — more damping = smoother, less twitchy
+  // ----- jump (vertical hop; airborne clears obstacles) -----
+  const JUMP_V0 = 168, GRAVITY = 560;   // ~0.6s hop, ~25px apex
+  function doJump(){
+    if(G.state!=='play' || G.airborne) return;
+    G.airborne=true; G.jumpVel=JUMP_V0; G.jumpH=0.001; G.squashY=1.30;
+    AudioFX.jump();
+  }
+  function landBoat(){
+    G.airborne=false; G.jumpH=0; G.jumpVel=0; G.squashY=0.74;
+    AudioFX.land();
+  }
+
   function reset(){
     G.score=0; G.dist=0; G.lives=3; G.boatX=0; G.vx=0; G.inv=0;
     G.items.length=0; G.spawnT=0.6; G.speed=0.34; G.t=0; G.shake=0;
+    G.curve=0; G.curveTarget=0; G.curveTimer=2.5;
+    G.airborne=false; G.jumpH=0; G.jumpVel=0; G.squashY=1;
     held.left=held.right=false;
     updateHUD();
   }
 
   function spawn(){
-    const isPickup = Math.random() < 0.42;
     const xRel = (Math.random()*1.5 - 0.75);
-    if(isPickup){
+    const roll = Math.random();
+    if(roll < 0.10){                       // ~10% ramps (launch a jump)
+      G.items.push({ kind:'ramp', spr:SPR_RAMP, xRel, t:0, hw:8, gone:false });
+    } else if(roll < 0.50){                // ~40% pickups
       const p = PICKUPS[(Math.random()*PICKUPS.length)|0];
       G.items.push({ kind:'pick', spr:p.spr, pts:p.pts, xRel, t:0, hw:8, gone:false });
-    } else {
+    } else {                               // ~50% obstacles
       const o = OBSTACLES[(Math.random()*OBSTACLES.length)|0];
       G.items.push({ kind:'obs', spr:o, xRel, t:0, hw: o===SPR_LOG?16:8, gone:false });
     }
@@ -508,16 +557,33 @@
     G.dist += G.speed * dt * 60;
     G.score += G.speed * dt * 60 * 0.6;
 
-    // steering (held = continuous)
+    // steering (held = continuous) — gentler accel/top-speed + stronger damping
     const dir = (held.left?-1:0) + (held.right?1:0);
-    const acc = 3.4, max = 1.7;
-    G.vx += dir*acc*dt;
-    G.vx *= 0.86;                                   // friction
-    if(Math.abs(G.vx)>max) G.vx = Math.sign(G.vx)*max;
+    G.vx += dir*STEER_ACC*dt;
+    G.vx *= STEER_FRICTION;
+    if(Math.abs(G.vx)>STEER_MAX) G.vx = Math.sign(G.vx)*STEER_MAX;
     G.boatX += G.vx;
-    const lim = 0.86;
-    if(G.boatX> lim){ G.boatX= lim; G.vx*=-0.3; }
-    if(G.boatX<-lim){ G.boatX=-lim; G.vx*=-0.3; }
+    const lim = 0.78;
+    if(G.boatX> lim){ G.boatX= lim; G.vx*=-0.2; }
+    if(G.boatX<-lim){ G.boatX=-lim; G.vx*=-0.2; }
+
+    // river bend: ease the curvature toward a fresh target every few seconds (telegraphed)
+    G.curveTimer -= dt;
+    if(G.curveTimer<=0){
+      const prev = G.curveTarget;
+      G.curveTarget = (Math.random()*1.8 - 0.9);
+      G.curveTimer = 3.2 + Math.random()*3.0;
+      if(Math.abs(G.curveTarget-prev) > 0.4) AudioFX.turn();
+    }
+    G.curve += (G.curveTarget - G.curve) * Math.min(1, dt*0.8);   // slow ease-in = readable
+
+    // jump physics (vertical hop; airborne clears obstacles)
+    if(G.airborne){
+      G.jumpVel -= GRAVITY*dt;
+      G.jumpH  += G.jumpVel*dt;
+      if(G.jumpH<=0) landBoat();
+    }
+    G.squashY += (1 - G.squashY) * Math.min(1, dt*10);            // ease squash/stretch back
 
     if(G.inv>0) G.inv -= dt;
     if(G.shake>0) G.shake -= dt;
@@ -537,14 +603,16 @@
         const dxRel = Math.abs(it.xRel - G.boatX);
         const thresh = it.kind==='obs' ? (it.hw/BOTW + 0.14) : (it.hw/BOTW + 0.10);
         if(dxRel < thresh){
-          it.hit = true;
           if(it.kind==='pick'){
-            it.gone=true;
+            it.hit = true; it.gone=true;
             G.score += it.pts;
             (it.pts>=100 ? AudioFX.bonus : AudioFX.pickup)();
-            it.pop = 0.0;
-          } else if(G.inv<=0){
-            it.gone=true;
+          } else if(it.kind==='ramp'){
+            it.hit = true; it.gone=true;
+            G.score += 25;                          // small boost for hitting the ramp
+            if(!G.airborne){ G.airborne=true; G.jumpVel=JUMP_V0*1.18; G.jumpH=0.001; G.squashY=1.34; AudioFX.ramp(); }
+          } else if(!G.airborne && G.inv<=0){       // airborne -> obstacle is cleared (no it.hit so it can still land on you)
+            it.hit = true; it.gone=true;
             G.lives--;
             G.inv = 1.4;                  // invulnerable + blink window
             G.shake = 0.35;
@@ -584,8 +652,9 @@
     for(let y=HZ;y<BASE_H;y++){
       const t = Math.sqrt(Math.max(0,(y-HZ)/(BASE_H+24-HZ)));
       const hw = halfW(t);
+      const cc = cxAt(t);                              // bent channel center
       const wob = Math.sin((y*0.5)+waterPhase*3.0)*1.4*t;
-      let l = Math.round(CX - hw + wob), r = Math.round(CX + hw + wob);
+      let l = Math.round(cc - hw + wob), r = Math.round(cc + hw + wob);
       // banded blue with scrolling ripples
       const band = Math.sin(y*0.6 + waterPhase*4.0 + t*3);
       bx.fillStyle = band>0 ? '#2f8fd6' : '#2477b8';
@@ -616,17 +685,26 @@
   }
 
   function drawBoat(){
-    const t=0.9, y=yAt(t)-6, x=xAt(G.boatX,t);
+    const t=0.9, groundY=yAt(t)-6, x=xAt(G.boatX,t);
+    const h = G.jumpH;                       // px above the water
+    const y = groundY - h;
+    // shadow on the water (shrinks as the boat rises)
+    const shW = Math.max(6, 26*(1 - Math.min(0.7, h/46)));
+    bx.fillStyle='rgba(8,20,40,0.30)';
+    bx.beginPath(); bx.ellipse(x, groundY+10, shW/2, 3, 0, 0, Math.PI*2); bx.fill();
     // blink during invulnerability
     const blink = G.inv>0 && (Math.floor(G.t*16)%2===0);
     if(blink) return;
-    // wake foam behind/under the boat
-    bx.fillStyle='#dff4ff';
-    for(let i=0;i<5;i++){
-      const fy=y+12+i*2, fw=10-i;
-      bx.fillRect(Math.round(x-fw), fy, fw*2, 1);
+    // wake foam only while riding the water (not mid-jump)
+    if(h < 4){
+      bx.fillStyle='#dff4ff';
+      for(let i=0;i<5;i++){
+        const fy=groundY+12+i*2, fw=10-i;
+        bx.fillRect(Math.round(x-fw), fy, fw*2, 1);
+      }
     }
-    drawSprite(SPR_BOAT, x, y, 2);
+    // squash & stretch via non-uniform pixel blocks (taller on launch, flatter on land)
+    drawSprite(SPR_BOAT, x, y, 2*(2-G.squashY), 2*G.squashY);
   }
 
   function render(){
@@ -712,13 +790,21 @@
   }
   bindHold($('btnLeft'),'left');
   bindHold($('btnRight'),'right');
+  (function bindJump(){
+    const b=$('btnJump');
+    const on=e=>{ e.preventDefault(); AudioFX.ensure(); AudioFX.resume(); doJump(); };
+    b.addEventListener('pointerdown',on);
+    b.addEventListener('touchstart',on,{passive:false});
+  })();
 
   window.addEventListener('keydown', e=>{
+    if(e.key===' '||e.key==='ArrowUp'||e.key==='ArrowDown') e.preventDefault(); // no page scroll
     if(e.key==='ArrowLeft'||e.key==='a'){ held.left=true; }
     else if(e.key==='ArrowRight'||e.key==='d'){ held.right=true; }
-    else if((e.key===' '||e.key==='Enter')){
-      if(G.state==='title') startGame();
-      else if(G.state==='over') startGame();
+    else if(e.key==='ArrowUp'||e.key==='w'){ doJump(); }
+    else if(e.key===' '||e.key==='Enter'){
+      if(G.state==='play') doJump();
+      else if(G.state==='title'||G.state==='over') startGame();
     }
   });
   window.addEventListener('keyup', e=>{

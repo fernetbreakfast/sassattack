@@ -108,6 +108,29 @@
   .rules .lead{ color:#9fe6ff; font-style:italic; }
   .rules b{ color:#ffd23f; } .rules .chick{ color:#fff; } .rules .warn{ color:#ff9ecf; }
   .rules .tag{ display:inline-block; min-width:78px; font-weight:900; color:#37ffb0; letter-spacing:1px; }
+  /* LSL trivia options */
+  .trivopts{ display:flex; flex-direction:column; gap:8px; width:min(94vw,380px); }
+  .trivopt{ font-family:inherit; cursor:pointer; text-align:left; border-radius:12px; padding:12px 14px;
+    font-size:15px; font-weight:700; color:#fff; border:2px solid #2b3566; background:rgba(8,12,30,.66);
+    transition:transform .06s, background .12s, border-color .12s; }
+  .trivopt:active{ transform:scale(.98); background:rgba(0,224,255,.18); }
+  .trivopt .trk{ display:inline-block; min-width:22px; font-weight:900; color:#9fe6ff; }
+  .trivopt.right{ border-color:#37ffb0; background:rgba(55,255,176,.22); }
+  .trivopt.wrong{ border-color:#ff5566; background:rgba(255,85,102,.22); }
+  /* kick + finale layers keep the canvas scene visible */
+  .kicklayer{ justify-content:flex-end; gap:12px; padding-bottom:max(26px,env(safe-area-inset-bottom)); }
+  .kicklayer .tagline{ background:rgba(8,12,30,.6); border-radius:10px; padding:6px 12px; }
+  .finalelayer{ justify-content:flex-start; padding-top:max(40px,env(safe-area-inset-top)); gap:14px; }
+  /* 2-player cross-game apply */
+  .applywrap{ width:min(94vw,420px); margin-top:6px; }
+  .applylead{ color:#9fe6ff; font-size:13px; margin:6px 0; letter-spacing:.5px; }
+  .applyrow{ display:flex; align-items:center; gap:8px; margin:5px 0; }
+  .applywho{ min-width:42px; font-weight:900; color:#ffd23f; letter-spacing:1px; text-align:left; }
+  .applybtns{ display:flex; gap:6px; flex:1 1 0; }
+  .applybtns button{ flex:1 1 0; font-family:inherit; cursor:pointer; font-weight:900; font-size:14px;
+    color:#05060f; border:none; border-radius:10px; padding:9px 4px; background:linear-gradient(90deg,#37ffb0,#00e0ff); }
+  .applybtns button:active{ transform:translateY(1px); }
+  .applybtns.done{ color:#37ffb0; font-weight:900; font-size:13px; align-items:center; padding:6px 0; }
 </style>
 </head>
 <body>
@@ -184,6 +207,11 @@
         <div class="res-card" id="resC0"><div class="rn" id="resN0">P1</div><div class="rs" id="resS0">$0</div></div>
         <div class="res-card" id="resC1"><div class="rn" id="resN1">P2</div><div class="rs" id="resS1">$0</div></div>
       </div>
+      <div id="applyWrap" class="applywrap hidden">
+        <p class="applylead pixfont">Apply your total to another game&rsquo;s leaderboard:</p>
+        <div class="applyrow"><span class="applywho" id="applyWho0">P1</span><span class="applybtns" id="applyBtns0"></span></div>
+        <div class="applyrow"><span class="applywho" id="applyWho1">P2</span><span class="applybtns" id="applyBtns1"></span></div>
+      </div>
     </div>
     <button class="btn" id="btnAgain">PLAY AGAIN</button>
     <button class="btn alt" id="btnBoardR">SCOREBOARD</button>
@@ -206,11 +234,30 @@
       <p><span class="tag warn">HAWKS</span> Jerks with wings will <b>dive at you from the sky</b>. Smack one with the <b>THROW</b> button to launch a chicken at it&hellip; but heads up, genius: that chicken you chuck was worth <b>&minus;$1,000,000</b>. So every hawk you splat costs you a cool million. Dodge or pay up. Your call, big spender.</p>
       <p><span class="tag">JUMP</span> Hit <b>JUMP</b> (or &#9650;/Space) to hop over trouble. Find a <b>ramp</b> and you&rsquo;ll launch way higher &mdash; and a trail of <b>money bags</b> (<b>+$250,000</b> each) appears in the air. Steer into them while you&rsquo;re flying to grab the loot. Very cool, very show-off, please don&rsquo;t miss the landing.</p>
       <p><span class="tag warn">CHUCK ALL</span> The big finale: <b>CHUCK ALL</b> dumps every chicken you&rsquo;re hoarding, capsizes the boat in a glorious sinking spectacle, and cashes you out for a flat <b>$10,000,000 jackpot</b>&hellip; and then your run is <b>over</b>. Yes, the boat goes down with all hands. Tragic. Lucrative. Use it when you&rsquo;re feeling brave (or about to die anyway).</p>
-      <p><span class="tag">LIVES</span> You get <b>5 lives</b>. That&rsquo;s five. Not fifty. Spend them like they matter, because apparently nobody taught you that earlier.</p>
-      <p><span class="tag">LOOT</span> Grab the random <b>bonus pickups</b> floating by for some extra pocket change. Won&rsquo;t make you a millionaire, but every little bit soothes the ego.</p>
+      <p><span class="tag">LIVES</span> You get <b>5 lives</b>. That&rsquo;s five. Not schwifty. Spend them like they matter, because apparently nobody taught you that earlier.</p>
+      <p><span class="tag">LOOT</span> Grab the random <b>bonus pickups</b> floating by for some extra pocket change. Won&rsquo;t make you a millionaire, like your hot-shot big-boy-boyfriend, but every little bit soothes the ego.</p>
       <p class="lead">That&rsquo;s it. Go rescue some chickens and try not to embarrass yourself out there. I believe in you. Mostly.</p>
     </div>
     <button class="btn alt" id="btnRulesBack">GOT IT, GENIUS</button>
+  </div>
+
+  <div id="scrTrivia" class="layer hidden">
+    <h1 class="title pixfont" style="font-size:clamp(24px,7.5vw,42px)">BONUS<br>TRIVIA</h1>
+    <p class="tagline pixfont" id="trivCat">Leisure Suit Larry &mdash; 1987</p>
+    <div class="card" id="trivQ" style="font-size:15px;max-width:380px;">&nbsp;</div>
+    <div id="trivOpts" class="trivopts"></div>
+    <p class="small pixfont">get it right to unlock a bonus round!</p>
+  </div>
+
+  <div id="scrKick" class="layer hidden kicklayer">
+    <p class="tagline pixfont" id="kickHint">TAP <b>KICK</b> when the marker hits the <span style="color:#37ffb0;">green</span>!</p>
+    <button class="btn alt" id="btnKick" style="min-width:200px;">KICK!</button>
+  </div>
+
+  <div id="scrFinale" class="layer hidden finalelayer">
+    <h1 class="title pixfont" id="finTitle" style="font-size:clamp(34px,11vw,64px)">GOOOAL!</h1>
+    <div class="card" id="finMsg" style="max-width:360px;">&nbsp;</div>
+    <button class="btn" id="btnFinale">CASH IN</button>
   </div>
 </div>
 
@@ -245,6 +292,14 @@
       if(muted || !ctx || !chickEl) return;
       try{ const c=(typeof chickEl.cloneNode==='function') ? chickEl.cloneNode() : chickEl;
         c.volume=0.95; const p=c.play(); if(p && p.catch) p.catch(()=>{}); }catch(e){}
+    }
+    // chuckachicken_02 = slowed ~30% + lightly reverbed version of the pickup clip -> used for the KICK
+    let kickEl=null;
+    try{ kickEl=new Audio('/boat/snd/chuckachicken_02.mp3'); kickEl.preload='auto'; kickEl.load(); }catch(e){ kickEl=null; }
+    function kickfx(){
+      if(muted || !ctx || !kickEl) return;
+      try{ const c=(typeof kickEl.cloneNode==='function') ? kickEl.cloneNode() : kickEl;
+        c.volume=1.0; const p=c.play(); if(p && p.catch) p.catch(()=>{}); }catch(e){}
     }
     function tone(freq,dur,type,peak,slideTo,delay){
       if(!ensure()||muted) return;
@@ -286,6 +341,10 @@
                              tone(240,1.7,'sawtooth',0.18,60); tone(120,1.9,'sine',0.13,42,0.06);          // foghorn down
                              tone(360,1.3,'triangle',0.08,90,0.12);
                              [0.45,0.75,1.05,1.35,1.65].forEach((d,i)=> tone(300-i*30,0.2,'sine',0.07,130,d)); }; // gurgles
+    const refwhistle = () => { tone(2300,0.10,'square',0.10,2600); tone(2300,0.10,'square',0.10,2600,0.14); tone(2600,0.18,'square',0.12,2200,0.28); }; // kickoff whistle
+    const goalfx   = () => { arp([523,659,784,1046,1318],0.06,0.4,'square',0.16); arp([784,1046,1318,1568,2093],0.06,0.5,'triangle',0.12); // GOAL cheer
+                             noise(0.6,0.18,0,2600); [0.1,0.3,0.5].forEach(d=> tone(1568,0.4,'sine',0.08,null,d)); };
+    const missfx   = () => { tone(392,0.5,'triangle',0.16,160); tone(294,0.6,'sawtooth',0.12,120,0.12); noise(0.3,0.14,0.0,600); }; // sad womp
     const screech  = () => { tone(1500,0.16,'sawtooth',0.10,2300); tone(2100,0.12,'sawtooth',0.07,1500,0.05); }; // raptor screech
     const hawkHit  = () => { noise(0.18,0.22,0,1200); tone(520,0.16,'square',0.13,180); arp([900,640,440],0.05,0.12,'triangle',0.10); };
     // chicken cluck: a short pitched chirp gliding down + a band-noise transient = "bok"
@@ -352,7 +411,8 @@
     function setMuted(m){ muted=m; try{ localStorage.setItem('boat_muted', m?'1':'0'); }catch(e){} if(master) master.gain.value=m?0:0.9; }
     return { ensure, resume, isMuted:()=>muted, setMuted,
              pickup, bonus, hit, lifeLost, start, over, jump, land, turn, ramp, cluck, rescue,
-             chickpick, throwfx, screech, hawkHit, select, jackpot, sink, startBed, stopBed };
+             chickpick, kickfx, throwfx, screech, hawkHit, select, jackpot, sink,
+             refwhistle, goalfx, missfx, startBed, stopBed };
   })();
 
   /* ===== 16-bit PALETTE + SPRITES (chunky pixel-art, integer-scaled buffer) ===== */
@@ -685,14 +745,18 @@
     const c=new AbortController(); const t=setTimeout(()=>c.abort(),ms);
     return fetch(url,{...opts, signal:c.signal}).finally(()=>clearTimeout(t));
   }
-  async function postScore(score, ini){          // fire-and-forget; never blocks the UI
+  // post a score to ANY game's board (boat by default). fire-and-forget; never blocks the UI.
+  async function postScoreTo(game, score, ini){
     const h={'Content-Type':'application/json','X-Score-Token':SCORE_TOKEN};
     const runId=Date.now().toString(36)+Math.random().toString(36).slice(2,10);
     try{ await fetchT(SCORES_ENDPOINT,{method:'POST',headers:h,
-      body:JSON.stringify({ score:Math.round(score), initials:ini, run_id:runId, mode:'', game:GAME })}); }catch(e){}
+      body:JSON.stringify({ score:Math.round(score), initials:ini, run_id:runId, mode:'', game })}); }catch(e){}
     try{ await fetchT(SCORE_ENDPOINT,{method:'POST',headers:h,
-      body:JSON.stringify({ score:Math.round(score), initials:ini, game:GAME })}); }catch(e){}
+      body:JSON.stringify({ score:Math.round(score), initials:ini, game })}); }catch(e){}
   }
+  function postScore(score, ini){ return postScoreTo(GAME, score, ini); }   // boat board (unchanged behavior)
+  // cross-game application targets (2-player only): NG/OG/GYUH leaderboards
+  const APPLY_GAMES = [ { key:'new', label:'NG' }, { key:'old', label:'OG' }, { key:'memory', label:'GYUH' } ];
 
   /* ===== state ===== */
   const G = { state:'title', score:0, dist:0, best:0, lives:5, rescued:0, cap:null, lastCapsize:false,
@@ -1168,10 +1232,14 @@
   }
   function render(){
     bx.clearRect(0,0,BASE_W,BASE_H);
-    drawWater();
-    if(G.state==='capsize'){ drawCapsize(); }
-    else { drawItems(); drawHawks(); drawBoat(); drawProjectiles(); }
-    drawPops();
+    if(G.state==='kick'){ drawKickScene(); }
+    else if(G.state==='finale'){ drawFinale(); }
+    else {
+      drawWater();
+      if(G.state==='capsize'){ drawCapsize(); }
+      else { drawItems(); drawHawks(); drawBoat(); drawProjectiles(); }
+      drawPops();
+    }
     let sx=offX, sy=offY;
     if(G.shake>0){ sx+=(Math.random()*2-1)*viewScale; sy+=(Math.random()*2-1)*viewScale; }
     sctx.fillStyle='#05060f'; sctx.fillRect(0,0,screen.width,screen.height);
@@ -1201,11 +1269,13 @@
     if(!last) last=ts; let dt=(ts-last)/1000; last=ts; if(dt>0.05) dt=0.05;
     updateClouds(dt);                               // clouds drift on every screen, even the title
     if(G.state==='play'||G.state==='capsize') update(dt);
+    else if(G.state==='kick') updateKick(dt);
+    else if(G.state==='finale') updateFinale(dt);
     render();
   }
 
   /* ===== screen flow ===== */
-  const LAYERS=['scrTitle','scrPlayers','scrInitials','scrPass','scrResults','scrBoard','scrRules'];
+  const LAYERS=['scrTitle','scrPlayers','scrInitials','scrPass','scrResults','scrBoard','scrRules','scrTrivia','scrKick','scrFinale'];
   function show(which){
     LAYERS.forEach(id=> $(id).classList.toggle('hidden', id!==which));
     const playing=(which==='play');
@@ -1257,9 +1327,15 @@
   function gameOver(){ if(G.state!=='play') return; G.lastCapsize=false; endRun(); }
   function endRun(){
     G.state='over'; AudioFX.stopBed();
+    // LSL TRIVIA GATE: 1-in-20 (5%) chance at EACH player's game-over -> correct unlocks the Kickin Chicken bonus
+    if(Math.random()<0.05){ startTrivia(); }
+    else { finalizeRun(); }
+  }
+  // record the final score (incl. any bonus), post to the boat board, then continue the normal flow
+  function finalizeRun(){
     players[cur].score=Math.floor(G.score); players[cur].rescued=G.rescued;
     if(G.score>G.best){ G.best=Math.floor(G.score); try{ localStorage.setItem('boat_best', String(G.best)); }catch(e){} }
-    postScore(players[cur].score, players[cur].ini);          // online leaderboard (game='boat')
+    postScore(players[cur].score, players[cur].ini);          // online leaderboard (game='boat') — unchanged
     if(mode===2 && cur===0){ showPass(); } else { showResults(); }
   }
   function showPass(){
@@ -1285,8 +1361,156 @@
       const w = players[0].score===players[1].score ? -1 : (players[0].score>players[1].score?0:1);
       $('resC0').classList.toggle('win', w===0); $('resC1').classList.toggle('win', w===1);
       $('resWinner').textContent = w<0 ? 'IT\u2019S A TIE!' : (players[w].ini+' WINS!');
+      buildApplyPanel();                              // 2-player only: apply your total to another game's board
     }
     show('scrResults');
+  }
+  // 2-PLAYER cross-game leaderboard apply. UX: each player gets their OWN row of board buttons
+  // (NG / OG / GYUH) and independently chooses where to send their total; the row locks after sending.
+  function buildApplyPanel(){
+    $('applyWrap').classList.remove('hidden');
+    for(let p=0;p<2;p++){
+      $('applyWho'+p).textContent=players[p].ini;
+      const host=$('applyBtns'+p); host.className='applybtns'; host.innerHTML='';
+      APPLY_GAMES.forEach(g=>{
+        const b=document.createElement('button'); b.type='button'; b.textContent=g.label;
+        b.addEventListener('click', ()=>{
+          AudioFX.ensure(); AudioFX.resume(); AudioFX.select();
+          postScoreTo(g.key, players[p].score, players[p].ini);     // POST total to chosen game's board
+          host.className='applybtns done';
+          host.innerHTML='\u2713 '+players[p].ini+' &rarr; '+g.label+' ($'+players[p].score.toLocaleString()+')';
+        });
+        host.appendChild(b);
+      });
+    }
+  }
+
+  /* ================= LSL TRIVIA -> KICKIN CHICKEN BONUS -> FINALE ================= */
+  // vetted trivia bank: Leisure Suit Larry in the Land of the Lounge Lizards (Sierra, 1987)
+  const LSL_TRIVIA = [
+    { q:"In Leisure Suit Larry (1987), the main character's name is?", opts:["Larry Laffer","Larry Lounge","Larry Lizard","Larry Suit"], correct:0 },
+    { q:"Leisure Suit Larry was published by which company?", opts:["Sierra","LucasArts","Atari","Nintendo"], correct:0 },
+    { q:"What is Larry known for wearing?", opts:["A white leisure suit","A tuxedo","A bathrobe","Overalls"], correct:0 },
+    { q:"Leisure Suit Larry is set in which city (a Las Vegas parody)?", opts:["Lost Wages","Sin City","Las Venturas","New Reno"], correct:0 },
+    { q:"What year was the first Leisure Suit Larry released?", opts:["1987","1995","1980","2001"], correct:0 },
+    { q:"Who created/designed Leisure Suit Larry?", opts:["Al Lowe","Roberta Williams","Sid Meier","Shigeru Miyamoto"], correct:0 }
+  ];
+  let trivLock=false;
+  function startTrivia(){
+    const t=LSL_TRIVIA[(Math.random()*LSL_TRIVIA.length)|0];
+    trivLock=false;
+    $('trivQ').textContent=t.q;
+    const wrap=$('trivOpts'); wrap.innerHTML='';
+    const L=['A','B','C','D'];
+    t.opts.forEach((opt,i)=>{
+      const b=document.createElement('button'); b.type='button'; b.className='trivopt';
+      b.innerHTML='<span class="trk">'+L[i]+'</span> '+opt;
+      b.addEventListener('click', ()=>{ AudioFX.ensure(); AudioFX.resume(); answerTrivia(i===t.correct, b, wrap, t.correct); });
+      wrap.appendChild(b);
+    });
+    AudioFX.select(); show('scrTrivia');
+  }
+  function answerTrivia(correct, btn, wrap, correctIdx){
+    if(trivLock) return; trivLock=true;
+    const kids=wrap.children;
+    kids[correctIdx].classList.add('right');
+    if(!correct){ btn.classList.add('wrong'); }
+    if(correct){ AudioFX.bonus(); setTimeout(startKick, 650); }      // correct -> Kickin Chicken bonus round
+    else { AudioFX.missfx(); setTimeout(finalizeRun, 900); }         // wrong -> skip bonus, normal game-over
+  }
+
+  // ---- KICKIN CHICKEN: single-button timing skill-shot. Marker oscillates; tap when it's in the green. ----
+  function startKick(){
+    G.state='kick';
+    G.kick={ phase:'aim', meter:Math.random()*0.25, dir:1, spd:0.92, t:0, ballT:0, result:null,
+             sweetLo:0.40, sweetHi:0.60, tx:CX, ty:150 };
+    AudioFX.refwhistle();
+    show('scrKick');
+  }
+  function kickPress(){
+    const k=G.kick; if(!k || k.phase!=='aim') return;
+    k.phase='shot'; k.t=0; k.ballT=0;
+    AudioFX.kickfx();                                                // processed slowed+reverbed chuck sound
+    const m=k.meter, goal=(m>=k.sweetLo && m<=k.sweetHi);
+    k.result = goal ? 'goal' : 'miss';
+    if(goal){ k.tx=CX; k.ty=150; }
+    else { k.tx=CX + (m<k.sweetLo?-118:118); k.ty=118 + Math.random()*26; }
+  }
+  function updateKick(dt){
+    const k=G.kick; if(!k){ startFinale('miss'); return; }
+    k.t+=dt;
+    if(k.phase==='aim'){
+      k.meter += k.dir*k.spd*dt;
+      if(k.meter>=1){ k.meter=1; k.dir=-1; } else if(k.meter<=0){ k.meter=0; k.dir=1; }
+    } else if(k.phase==='shot'){
+      k.ballT += dt/1.15;
+      if(k.ballT>=1){ k.ballT=1; k.phase='done';
+        if(k.result==='goal'){ G.score+=10000000; AudioFX.goalfx(); } else { AudioFX.missfx(); }
+        startFinale(k.result);
+      }
+    }
+  }
+  function drawKickScene(){
+    let g=bx.createLinearGradient(0,0,0,BASE_H);
+    g.addColorStop(0,'#3fae5c'); g.addColorStop(1,'#1f7a36');
+    bx.fillStyle=g; bx.fillRect(0,0,BASE_W,BASE_H);
+    for(let y=0;y<BASE_H;y+=26){ bx.fillStyle=(((y/26)|0)&1)?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.05)'; bx.fillRect(0,y,BASE_W,13); }
+    drawClouds();
+    // soccer goal (net + posts)
+    const gx=CX, gy=164, gw=140, gh=72, left=gx-gw/2, right=gx+gw/2, top=gy-gh;
+    bx.strokeStyle='rgba(255,255,255,0.45)'; bx.lineWidth=1;
+    for(let x=left;x<=right;x+=11){ bx.beginPath(); bx.moveTo(x,top); bx.lineTo(x,gy); bx.stroke(); }
+    for(let y=top;y<=gy;y+=11){ bx.beginPath(); bx.moveTo(left,y); bx.lineTo(right,y); bx.stroke(); }
+    bx.fillStyle='#ffffff';
+    bx.fillRect(left-4,top-4,4,gh+8); bx.fillRect(right,top-4,4,gh+8); bx.fillRect(left-4,top-4,gw+8,4);
+    // penalty spot + ground line
+    bx.fillStyle='rgba(255,255,255,0.55)'; bx.fillRect(gx-2, 360, 4, 4);
+    // the chicken (ball)
+    const k=G.kick; let cxp=CX, cyp=362, sc=2.4;
+    if(k && k.phase!=='aim'){ const tt=k.ballT, arc=Math.sin(tt*Math.PI)*150;
+      cxp=CX+(k.tx-CX)*tt; cyp=362+(k.ty-362)*tt-arc; sc=2.4-tt*1.3; }
+    const sp=1+0.32*Math.sin((k?k.t:0)*12 + (k?k.ballT*26:0));
+    drawSprite(SPR_CHICKEN, cxp, cyp, Math.max(0.6,sc*sp), Math.max(0.6,sc/sp));
+    // shadow under the resting chicken
+    if(!k || k.phase==='aim'){ bx.fillStyle='rgba(0,0,0,0.22)'; bx.beginPath(); bx.ellipse(CX,392,18,5,0,0,Math.PI*2); bx.fill(); }
+    // timing meter
+    if(k && k.phase==='aim'){
+      const bw=210, bh=20, mx=CX-bw/2, my=430;
+      bx.fillStyle='rgba(0,0,0,0.55)'; bx.fillRect(mx-3,my-3,bw+6,bh+6);
+      bx.fillStyle='#16203c'; bx.fillRect(mx,my,bw,bh);
+      bx.fillStyle='#37ffb0'; bx.fillRect(mx+bw*k.sweetLo,my,bw*(k.sweetHi-k.sweetLo),bh);   // sweet spot
+      bx.fillStyle='#ffd23f'; bx.fillRect(Math.round(mx+bw*k.meter-3),my-5,6,bh+10);          // marker
+    }
+  }
+
+  // ---- FINALE: celebratory for a goal (confetti), cheeky consolation for a miss ----
+  function startFinale(result){
+    G.state='finale';
+    G.finale={ result, t:0, confetti:[] };
+    if(result==='goal'){
+      const cols=['#ffd23f','#37ffb0','#ff6fae','#9fe6ff','#ff5566','#ffffff'];
+      for(let i=0;i<140;i++) G.finale.confetti.push({ x:Math.random()*BASE_W, y:-Math.random()*BASE_H,
+        vx:(Math.random()-0.5)*50, vy:70+Math.random()*150, c:cols[i%cols.length], s:2+Math.random()*4, rot:Math.random()*6, vr:(Math.random()-0.5)*8 });
+    }
+    $('finTitle').textContent = result==='goal' ? 'GOOOAL!' : 'SO CLOSE!';
+    $('finTitle').style.color = result==='goal' ? '#ffd23f' : '#9fe6ff';
+    $('finMsg').innerHTML = result==='goal'
+      ? 'The chicken ROCKETS into the top corner! The crowd goes bananas! <b>+$10,000,000</b> 🐔⚽'
+      : 'The chicken sails wide and clucks off in shame. No cash, but hey &mdash; style points. (Zero of them.)';
+    $('btnFinale').textContent = result==='goal' ? 'CASH IN' : 'WALK IT OFF';
+    show('scrFinale');
+  }
+  function updateFinale(dt){
+    const f=G.finale; if(!f) return; f.t+=dt;
+    for(const p of f.confetti){ p.y+=p.vy*dt; p.x+=p.vx*dt; p.rot+=p.vr*dt;
+      if(p.y>BASE_H+12){ p.y=-12; p.x=Math.random()*BASE_W; } }
+  }
+  function drawFinale(){
+    drawKickScene();
+    const f=G.finale; if(!f) return;
+    if(f.result==='goal'){ for(const p of f.confetti){ bx.fillStyle=p.c;
+      bx.fillRect(Math.round(p.x), Math.round(p.y), Math.max(2,p.s|0), Math.max(2,p.s|0)); } }
+    else { bx.fillStyle='rgba(6,14,34,0.25)'; bx.fillRect(0,0,BASE_W,BASE_H); }
   }
 
   /* ----- online scoreboard view (top 10, dollars) ----- */
@@ -1324,6 +1548,8 @@
   bindPress($('btnJump'), doJump);
   bindPress($('btnThrow'), doThrow);
   bindPress($('btnChuckAll'), doCapsize);
+  bindPress($('btnKick'), kickPress);                         // Kickin Chicken skill-shot
+  $('btnFinale').addEventListener('click', ()=>{ AudioFX.select(); finalizeRun(); });
 
   window.addEventListener('keydown', e=>{
     if(e.key===' '||e.key==='ArrowUp'||e.key==='ArrowDown') e.preventDefault();
@@ -1333,6 +1559,8 @@
       else if(e.key==='ArrowUp'||e.key==='w'||e.key===' '){ doJump(); }
       else if(e.key==='f'||e.key==='F'||e.key==='Shift'){ doThrow(); }
       else if(e.key==='c'||e.key==='C'){ doCapsize(); }
+    } else if(G.state==='kick'){
+      if(e.key===' '||e.key==='Enter'){ kickPress(); }          // single-button skill-shot via keyboard
     }
   });
   window.addEventListener('keyup', e=>{

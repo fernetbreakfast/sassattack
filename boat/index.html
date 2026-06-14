@@ -131,6 +131,22 @@
     color:#05060f; border:none; border-radius:10px; padding:9px 4px; background:linear-gradient(90deg,#37ffb0,#00e0ff); }
   .applybtns button:active{ transform:translateY(1px); }
   .applybtns.done{ color:#37ffb0; font-weight:900; font-size:13px; align-items:center; padding:6px 0; }
+  /* CHICKN KICKN full-screen flash when the bonus round loads */
+  #kickFlash{ position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    pointer-events:none; z-index:60; }
+  #kickFlash span{ font-family:"Courier New",monospace; font-weight:900; letter-spacing:4px; text-align:center;
+    font-size:clamp(52px,19vw,128px); line-height:.88; color:#ffd23f;
+    text-shadow:0 5px 0 #c0392b, 0 10px 0 #7a1d10, 0 0 36px rgba(255,210,63,.85);
+    -webkit-text-stroke:3px #2a1206; }
+  #kickFlash.show{ animation:kickflash 1.15s ease-out forwards; }
+  @keyframes kickflash{
+    0%{ opacity:0; transform:scale(2.7) rotate(-9deg); }
+    16%{ opacity:1; transform:scale(1) rotate(0deg); }
+    24%{ transform:scale(1.12) rotate(2deg); }
+    40%{ transform:scale(1) rotate(0deg); }
+    70%{ opacity:1; transform:scale(1.05); }
+    100%{ opacity:0; transform:scale(1.18); }
+  }
 </style>
 </head>
 <body>
@@ -258,7 +274,10 @@
     <h1 class="title pixfont" id="finTitle" style="font-size:clamp(34px,11vw,64px)">GOOOAL!</h1>
     <div class="card" id="finMsg" style="max-width:360px;">&nbsp;</div>
     <button class="btn" id="btnFinale">CASH IN</button>
+    <button class="btn alt hidden" id="btnFreeBye">FREE BYE</button>
   </div>
+
+  <div id="kickFlash" class="hidden"><span>CHICKN<br>KICKN</span></div>
 </div>
 
 <script>
@@ -738,10 +757,12 @@
   function cxAt(t){ return CX + bendPx(t); }
   function xAt(xRel, t){ return cxAt(t) + xRel*halfW(t); }
   const SB = 3;                 // boat block scale (16-bit chunky)
-  // BOAT_T = the boat's perspective position. Raised from 0.90 -> 0.76 so that, now the canvas fills the FULL
-  // screen height, the boat sprite + the collect/dodge action sit ABOVE the bottom control buttons (which are
-  // anchored at the very bottom) and never get covered. The water below the boat just sits behind the buttons.
-  const BOAT_T = 0.76;
+  const BOAT_SCALE = 2.5;       // gameplay boat draw scale (~17% smaller than SB=3, per screenshot feedback)
+  // BOAT_T = the boat's perspective position. Set to 0.83 so the (smaller) boat sits just ABOVE the bottom
+  // control buttons with a small clearance — no big water gap above the controls, and no overlap. The
+  // collision window + every boat-anchored element (flames, shadow, throw origin, hawk strike, umbrella,
+  // capsize) all key off BOAT_T so they move together.
+  const BOAT_T = 0.83;
   const HIT_LO = BOAT_T - 0.10, HIT_HI = BOAT_T + 0.09;   // collision window tracks the boat's new position
 
   /* ===== online leaderboard (game id 'boat') =====
@@ -913,7 +934,7 @@
     // the doomed boat: tilting + sinking, with a slow dramatic "camera push" zoom
     const tilt=1 - Math.min(0.85,c.roll*0.5);
     const zoom=1 + Math.min(0.5, c.t*0.10);
-    drawSprite(SPR_BOAT, bx0 + c.roll*24, groundY-8 + c.sink, SB*(2-tilt)*zoom, SB*tilt*zoom);
+    drawSprite(SPR_BOAT, bx0 + c.roll*24, groundY-8 + c.sink, BOAT_SCALE*(2-tilt)*zoom, BOAT_SCALE*tilt*zoom);
     // scattered chickens + feathers
     for(const p of c.parts){
       if(p.kind==='chick'){ const sp=1.0+0.25*Math.sin(p.rot); drawSprite(SPR_CHICKEN, p.x, p.y, 1.2*sp, 1.2/sp); }
@@ -1258,10 +1279,10 @@
       bx.fillStyle='#dff4ff';
       for(let i=0;i<6;i++){ const fy=groundY+22+i*3, fw=20-i*2; bx.fillRect(Math.round(x-fw), fy, fw*2, 2); }
     }
-    drawSprite(SPR_BOAT, x, y, SB*(2-G.squashY), SB*G.squashY);
+    drawSprite(SPR_BOAT, x, y, BOAT_SCALE*(2-G.squashY), BOAT_SCALE*G.squashY);
     const hot=held.left||held.right||G.airborne;
-    drawFlame(Math.round(x-18), Math.round(y+38), hot);
-    drawFlame(Math.round(x+18), Math.round(y+38), hot);
+    drawFlame(Math.round(x-15), Math.round(y+32), hot);     // flame offsets scaled down with the smaller hull
+    drawFlame(Math.round(x+15), Math.round(y+32), hot);
   }
 
   function drawHawks(){
@@ -1520,8 +1541,13 @@
     G.state='kick';
     G.kick={ phase:'aim', meter:Math.random()*0.25, dir:1, spd:0.92, t:0, ballT:0, result:null,
              sweetLo:0.40, sweetHi:0.60, tx:CX, ty:150 };
-    AudioFX.refwhistle();
     show('scrKick');
+    // big dramatic "CHICKN KICKN" flash that zooms/flashes in, then settles into the mini-game
+    const fl=$('kickFlash');
+    if(fl){ fl.classList.remove('hidden','show'); void fl.offsetWidth; fl.classList.add('show');
+      setTimeout(()=>{ fl.classList.add('hidden'); fl.classList.remove('show'); }, 1200); }
+    AudioFX.start();        // celebratory sting on the flash
+    AudioFX.refwhistle();   // kickoff whistle
   }
   function kickPress(){
     const k=G.kick; if(!k || k.phase!=='aim') return;
@@ -1541,7 +1567,8 @@
     } else if(k.phase==='shot'){
       k.ballT += dt/1.15;
       if(k.ballT>=1){ k.ballT=1; k.phase='done';
-        if(k.result==='goal'){ G.score+=10000000; AudioFX.goalfx(); } else { AudioFX.missfx(); }
+        // NOTE: on a goal we do NOT auto-award here — the finale lets the player choose CASH IN vs FREE BYE.
+        if(k.result==='goal'){ AudioFX.goalfx(); } else { AudioFX.missfx(); }
         startFinale(k.result);
       }
     }
@@ -1590,11 +1617,28 @@
     }
     $('finTitle').textContent = result==='goal' ? 'GOOOAL!' : 'SO CLOSE!';
     $('finTitle').style.color = result==='goal' ? '#ffd23f' : '#9fe6ff';
-    $('finMsg').innerHTML = result==='goal'
-      ? 'The chicken ROCKETS into the top corner! The crowd goes bananas! <b>+$10,000,000</b> 🐔⚽'
-      : 'The chicken sails wide and clucks off in shame. No cash, but hey &mdash; style points. (Zero of them.)';
-    $('btnFinale').textContent = result==='goal' ? 'CASH IN' : 'WALK IT OFF';
+    if(result==='goal'){
+      $('finMsg').innerHTML = 'BURIED in the top corner! 🐔⚽ Now choose: bank the <b>$10,000,000</b>&hellip; or take a <b>FREE BYE</b> &mdash; revive back to <b>5 lives</b> and keep the run going (no cash).';
+      $('btnFinale').textContent = 'CASH IN $10,000,000';
+      $('btnFreeBye').classList.remove('hidden');     // goal -> offer the choice
+    } else {
+      $('finMsg').innerHTML = 'The chicken sails wide and clucks off in shame. No cash, but hey &mdash; style points. (Zero of them.)';
+      $('btnFinale').textContent = 'WALK IT OFF';
+      $('btnFreeBye').classList.add('hidden');         // miss -> no choice, just the consolation
+    }
     show('scrFinale');
+  }
+  // FREE BYE: forgo the goal cash and get a free continue -> full lives, brief invuln, back into the run.
+  function freeBye(){
+    AudioFX.select();
+    G.lives=5; G.inv=2.5; G.shake=0;                   // revive with full lives + a safety window
+    G.cap=null; G.lastCapsize=false;                   // un-sink if they'd capsized
+    G.hawks.length=0; G.projectiles.length=0; G.items.length=0;   // clear hazards so they don't die on revive
+    G.airborne=false; G.jumpH=0; G.jumpVel=0; G.squashY=1; G.vx=0;
+    G.storm=null; G.stormT=8+Math.random()*8;
+    G.spawnT=0.8; G.throwCool=0; G.finale=null; G.kick=null;
+    held.left=held.right=false;
+    G.state='play'; show('play'); AudioFX.startBed(); updateHUD();   // keep score + dist; resume gameplay
   }
   function updateFinale(dt){
     const f=G.finale; if(!f) return; f.t+=dt;
@@ -1658,7 +1702,10 @@
   bindPress($('btnThrow'), doThrow);
   bindPress($('btnChuckAll'), doCapsize);
   bindPress($('btnKick'), kickPress);                         // Kickin Chicken skill-shot
-  $('btnFinale').addEventListener('click', ()=>{ AudioFX.select(); finalizeRun(); });
+  $('btnFinale').addEventListener('click', ()=>{ AudioFX.select();
+    if(G.finale && G.finale.result==='goal'){ G.score += 10000000; }   // CASH IN: award the goal money now
+    finalizeRun(); });
+  $('btnFreeBye').addEventListener('click', freeBye);                   // FREE BYE: skip the cash, revive into the run
 
   window.addEventListener('keydown', e=>{
     if(e.key===' '||e.key==='ArrowUp'||e.key==='ArrowDown') e.preventDefault();

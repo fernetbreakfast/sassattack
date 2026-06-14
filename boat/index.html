@@ -99,6 +99,15 @@
   #mute{ position:absolute; top:max(8px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
     pointer-events:auto; background:rgba(8,12,30,.6); border:2px solid #2b3566; color:#cdd6ff;
     border-radius:10px; font-size:13px; font-weight:700; padding:6px 12px; cursor:pointer; letter-spacing:1px; }
+  /* snarky rules / how-to overlay */
+  #btnRules{ background:linear-gradient(90deg,#ffd23f,#ff9ecf); color:#1a0008; box-shadow:0 8px 24px rgba(255,158,207,.4); }
+  .rules{ width:min(94vw,460px); max-height:56vh; overflow-y:auto; text-align:left;
+    background:rgba(8,12,30,.78); border:2px solid #2b3566; border-radius:16px;
+    padding:14px 16px; line-height:1.5; font-size:14px; color:#cdd6ff; -webkit-overflow-scrolling:touch; }
+  .rules p{ margin:8px 0; }
+  .rules .lead{ color:#9fe6ff; font-style:italic; }
+  .rules b{ color:#ffd23f; } .rules .chick{ color:#fff; } .rules .warn{ color:#ff9ecf; }
+  .rules .tag{ display:inline-block; min-width:78px; font-weight:900; color:#37ffb0; letter-spacing:1px; }
 </style>
 </head>
 <body>
@@ -114,10 +123,11 @@
   </div>
 
   <div id="pad" class="hidden">
+    <!-- control order, left->right: THROW · ◀ · ▶ · JUMP · CHUCK ALL (jump is now second-from-right) -->
     <button class="dbtn mini throw" id="btnThrow" aria-label="throw chicken">THROW</button>
     <button class="dbtn" id="btnLeft" aria-label="left">&#9664;</button>
-    <button class="dbtn mini jump" id="btnJump" aria-label="jump">JUMP</button>
     <button class="dbtn" id="btnRight" aria-label="right">&#9654;</button>
+    <button class="dbtn mini jump" id="btnJump" aria-label="jump">JUMP</button>
     <button class="dbtn mini chuckall" id="btnChuckAll" aria-label="chuck all and cash out">CHUCK<br>ALL</button>
   </div>
 
@@ -134,6 +144,7 @@
     </div>
     <button class="btn" id="btnStart">PLAY</button>
     <button class="btn alt" id="btnBoard">SCOREBOARD</button>
+    <button class="btn" id="btnRules">HOW TO PLAY</button>
     <p class="small pixfont">a Sass Attack joint</p>
   </div>
 
@@ -184,6 +195,22 @@
     <p class="tagline pixfont">Chuck a Chicken &mdash; top 10</p>
     <ol class="board" id="boardList"><li><span class="rk">&hellip;</span><span class="sc">loading</span></li></ol>
     <button class="btn" id="btnBoardBack">BACK</button>
+  </div>
+
+  <div id="scrRules" class="layer hidden">
+    <h1 class="title pixfont" style="font-size:clamp(26px,8vw,46px)">HOW TO<br>PLAY</h1>
+    <div class="rules" id="rulesBody">
+      <p class="lead">Oh, you need the rules? Adorable. Fine, pay attention &mdash; I&rsquo;m only explaining this once, hotshot.</p>
+      <p><span class="tag">DRIVE</span> Tap <b>&#9664;</b> and <b>&#9654;</b> to steer the boat. Rocks, logs and buoys are not your friends &mdash; kiss one and it costs you <b>a whole life</b>. Yes, they&rsquo;re big. Yes, you&rsquo;ll still hit them.</p>
+      <p><span class="tag">RESCUE</span> Scoop up every <span class="chick">chicken</span> bobbing in the river. Each feathery little nugget is worth <b>$1,000,000</b>. That is a million dollars. Per chicken. Try not to drool on the controls.</p>
+      <p><span class="tag warn">HAWKS</span> Jerks with wings will <b>dive at you from the sky</b>. Smack one with the <b>THROW</b> button to launch a chicken at it&hellip; but heads up, genius: that chicken you chuck was worth <b>&minus;$1,000,000</b>. So every hawk you splat costs you a cool million. Dodge or pay up. Your call, big spender.</p>
+      <p><span class="tag">JUMP</span> Hit <b>JUMP</b> (or &#9650;/Space) to hop over trouble. Find a <b>ramp</b> and you&rsquo;ll launch way higher &mdash; very cool, very show-off, please don&rsquo;t miss the landing.</p>
+      <p><span class="tag warn">CHUCK ALL</span> The big finale: <b>CHUCK ALL</b> dumps every chicken you&rsquo;re hoarding, capsizes the boat, and cashes you out for a flat <b>$1,000,000 jackpot</b>&hellip; and then your run is <b>over</b>. Glorious. Dramatic. Done. Use it when you&rsquo;re feeling brave (or about to die anyway).</p>
+      <p><span class="tag">LIVES</span> You get <b>5 lives</b>. That&rsquo;s five. Not fifty. Spend them like they matter, because apparently nobody taught you that earlier.</p>
+      <p><span class="tag">LOOT</span> Grab the random <b>bonus pickups</b> floating by for some extra pocket change. Won&rsquo;t make you a millionaire, but every little bit soothes the ego.</p>
+      <p class="lead">That&rsquo;s it. Go rescue some chickens and try not to embarrass yourself out there. I believe in you. Mostly.</p>
+    </div>
+    <button class="btn alt" id="btnRulesBack">GOT IT, GENIUS</button>
   </div>
 </div>
 
@@ -554,14 +581,29 @@
     "...vv....",
     "........."
   ];
+  // chunky 16-bit cloud (white body, light-blue underside shading) for the top-of-screen drift
+  const SPR_CLOUD = [
+    "................",
+    ".......fff......",
+    "....ffffffff....",
+    "...ffffffffff...",
+    "..fffffffffff...",
+    ".fffffffffffff..",
+    "..ffffffffffff..",
+    "..FFfffffffFFF..",
+    "...FFFFFFFFF....",
+    "................"
+  ];
 
   const PICKUPS = [
     { spr:SPR_EGG, pts:50 }, { spr:SPR_HOTDOG, pts:50 }, { spr:SPR_SANDWICH, pts:75 },
     { spr:SPR_DISCO, pts:100 }, { spr:SPR_COWBELL, pts:75 }, { spr:SPR_PUZZLE, pts:75 }, { spr:SPR_QBLOCK, pts:100 }
   ];
   const OBSTACLES = [ SPR_ROCK, SPR_LOG, SPR_BUOY ];
-  const CHICKEN_PTS = 150;
-  const HAWK_PTS = 120;
+  // ===== chickens are the headline currency: every bird is worth a cool million =====
+  const CHICKEN_VALUE = 1000000;   // +$1,000,000 per chicken RESCUED, -$1,000,000 per chicken THROWN
+  const CHICKEN_PTS = CHICKEN_VALUE;
+  const HAWK_PTS = 0;              // whacking a hawk saves a life — the reward is survival, not cash
 
   /* ===== buffer / scaling (16-bit: doubled internal resolution, integer-scaled blit) ===== */
   const screen = $('screen');
@@ -638,6 +680,28 @@
   const held = { left:false, right:false };
   let waterPhase = 0;
 
+  // ===== drifting 16-bit clouds: subtle top-of-screen background; some drift left, some right =====
+  const clouds = [
+    { x: 40,  y: 24, vx:  7, s: 2.0 },
+    { x: 150, y: 14, vx: -5, s: 1.4 },
+    { x: 248, y: 38, vx:  9, s: 1.7 },
+    { x: 300, y: 20, vx: -6, s: 2.3 },
+    { x: 110, y: 52, vx:  4, s: 1.2 }
+  ];
+  function updateClouds(dt){
+    for(const c of clouds){
+      c.x += c.vx*dt;
+      const margin = 30 + c.s*8;
+      if(c.vx>0 && c.x > BASE_W+margin) c.x = -margin;
+      else if(c.vx<0 && c.x < -margin) c.x = BASE_W+margin;
+    }
+  }
+  function drawClouds(){
+    bx.globalAlpha = 0.82;
+    for(const c of clouds) drawSprite(SPR_CLOUD, c.x, c.y, c.s);
+    bx.globalAlpha = 1;
+  }
+
   // steering feel (unchanged tuning) / jump (unchanged big-hop tuning)
   const STEER_ACC = 0.6, STEER_MAX = 0.30, STEER_FRICTION = 0.80;
   const JUMP_V0 = 220, GRAVITY = 440;   // apex ~55px(virtual), ~1.0s airtime; ramp jumps bigger
@@ -647,14 +711,15 @@
   // ----- sky enemies (hawks) + throw-chicken defense -----
   function spawnHawk(){
     const x=CX + (Math.random()*2-1)*130;
-    G.hawks.push({ x, y:HZ-8, t:0, dead:false, struck:false });
+    G.hawks.push({ x, y:HZ-96, t:0, dead:false, struck:false });   // start high in the sky so it visibly dives down
     AudioFX.screech();                         // audible telegraph
   }
-  // RESOURCE MODEL: each throw spends one RESCUED chicken (need >=1) -> risk/reward
+  // RESOURCE MODEL: each throw spends one RESCUED chicken (need >=1) AND its full $1,000,000 value -> real risk/reward
   function doThrow(){
     if(G.state!=='play' || G.throwCool>0) return;
     if(G.rescued<=0){ AudioFX.turn(); return; } // out of ammo -> soft tick
-    G.rescued--; G.throwCool=0.28; updateHUD();
+    G.rescued--; G.score -= CHICKEN_VALUE;        // chucking a chicken costs you that bird's cool million
+    G.throwCool=0.28; updateHUD();
     const x=xAt(G.boatX,0.9), y=yAt(0.9)-30;
     let tx=x, best=1e9;                          // aim at the nearest live hawk
     for(const hk of G.hawks){ if(hk.dead) continue; const d=Math.abs(hk.x-x)+Math.abs(hk.y-y); if(d<best){ best=d; tx=hk.x; } }
@@ -703,7 +768,7 @@
   function reset(){
     G.score=0; G.dist=0; G.lives=5; G.rescued=0; G.boatX=0; G.vx=0; G.inv=0; G.cap=null; G.lastCapsize=false;
     G.items.length=0; G.pops.length=0; G.hawks.length=0; G.projectiles.length=0;
-    G.spawnT=0.6; G.hawkT=6; G.throwCool=0; G.speed=0.34; G.t=0; G.shake=0; G.cluckT=4;
+    G.spawnT=0.6; G.hawkT=2.0; G.throwCool=0; G.speed=0.34; G.t=0; G.shake=0; G.cluckT=4;
     G.curve=0; G.curveTarget=0; G.curveTimer=2.5; G.curveEase=0.8;
     G.airborne=false; G.jumpH=0; G.jumpVel=0; G.squashY=1;
     held.left=held.right=false; updateHUD();
@@ -755,8 +820,10 @@
     G.spawnT -= dt;
     if(G.spawnT<=0){ spawn(); G.spawnT = spawnEvery*(0.7+Math.random()*0.6); }
 
-    // ----- hawks: begin after a short grace, then periodically (ramps with distance) -----
-    if(G.dist>500){ G.hawkT -= dt; if(G.hawkT<=0){ spawnHawk(); G.hawkT = Math.max(3.0, 7.5 - G.dist/1500)*(0.7+Math.random()*0.6); } }
+    // ----- hawks: begin after a SHORT time grace (~4s), then recur OFTEN (time-based, not distance-gated) -----
+    // (previously gated behind G.dist>500 ~= 25s of flawless running, so most runs ended before a single
+    //  hawk ever spawned and the THROW button had nothing to target. Now they show up early and reliably.)
+    if(G.t>4){ G.hawkT -= dt; if(G.hawkT<=0){ spawnHawk(); G.hawkT = (2.6 + Math.random()*2.2) - Math.min(1.2, G.dist/4000); } }
     const bScreenX=xAt(G.boatX,0.9), bY=yAt(0.9)-12;
     for(const hk of G.hawks){
       if(hk.dead) continue;
@@ -828,6 +895,29 @@
     bx.fillStyle=M;  bx.fillRect(x-s+2, y-s-2, Math.max(2,s*2-4), 3);// top mound
     bx.fillStyle=Lc; bx.fillRect(x-s+2, y-s-1, Math.max(2,s-1), 2);  // sunlit highlight
   }
+  // layered triangular pixel pine/evergreen: dark green with shaded tiers + brown trunk
+  function drawPine(x,baseY,s){
+    s=Math.max(5, s|0);
+    const dark='#0f3f20', body='#1c6234', lite='#34a356';
+    const trunkH=Math.max(2,(s*0.34)|0);
+    bx.fillStyle='#5a3a1c'; bx.fillRect(Math.round(x-1), Math.round(baseY-trunkH), 2, trunkH);   // trunk
+    bx.fillStyle='#3f2a14'; bx.fillRect(Math.round(x),   Math.round(baseY-trunkH), 1, trunkH);   // trunk shade
+    const tiers=3, tierH=Math.max(3,(s*0.66)|0);
+    let bottom=baseY-trunkH;                                   // bottom tier sits on the trunk
+    for(let tier=0; tier<tiers; tier++){
+      const frac=1 - tier*0.24;                               // bottom tier widest, apex narrowest
+      const halfW=Math.max(2,(s*0.62*frac)|0);
+      for(let r=0;r<tierH;r++){
+        const w=Math.max(1, Math.round(halfW*(r+1)/tierH));   // widen toward the bottom of each tier
+        const yy=bottom - r;
+        bx.fillStyle=dark; bx.fillRect(Math.round(x-w),   yy, w*2,                 1);  // dark edge row
+        bx.fillStyle=body; bx.fillRect(Math.round(x-w+1), yy, Math.max(1,w*2-2),   1);  // body
+        bx.fillStyle=lite; bx.fillRect(Math.round(x-w+1), yy, Math.max(1,w-1),     1);  // left-lit highlight
+      }
+      bottom -= (tierH-1);                                    // overlap tiers slightly going up
+    }
+    bx.fillStyle=lite; bx.fillRect(Math.round(x), Math.round(bottom-1), 1, 2);          // sunlit apex tip
+  }
   function drawReed(x,baseY,h,ph){
     const sway=Math.sin(ph)*2;
     bx.fillStyle='#2f9a4a';
@@ -841,6 +931,7 @@
     bx.fillStyle=sky; bx.fillRect(0,0,BASE_W,HZ);
     bx.fillStyle='rgba(255,255,255,0.10)';
     for(let i=0;i<4;i++){ const cxp=((i*101 + Math.floor(waterPhase*4)) % (BASE_W+80))-40; bx.fillRect(cxp, 26+i*16, 46, 7); }
+    drawClouds();                                   // drifting 16-bit clouds (behind banks + gameplay)
     // ---- lush layered banks: 3 scrolling tree layers along the horizon ----
     const veg=waterPhase*8;
     function treeRow(step,base,amp,col,par){
@@ -867,6 +958,17 @@
       const sz=3+((t*16)|0), h1=hash(i);
       const bxp=(i&1) ? (r+6 + h1*Math.max(0,BASE_W-r-10)) : (2 + h1*Math.max(0,l-10));
       drawBush(Math.round(bxp), Math.round(yy), sz, (hash(i*3+1)*3)|0);
+    }
+    // ---- pine/evergreen forest: extra trees packed onto both banks (kept off the play channel) ----
+    const pineScroll=waterPhase*34, pspan=(BASE_H-HZ);
+    for(let i=0;i<34;i++){
+      const yy=HZ+4+((i*37+pineScroll)%pspan);
+      const t=Math.sqrt(Math.max(0,(yy-HZ)/(BASE_H+50-HZ)));
+      const hwv=halfW(t), cc=cxAt(t), l=cc-hwv, r=cc+hwv;
+      const sz=5+((t*24)|0);
+      const h1=hash(i*5+2);
+      const bxp=(i&1) ? (r+8 + h1*Math.max(0,BASE_W-r-14)) : (4 + h1*Math.max(0,l-14));
+      drawPine(Math.round(bxp), Math.round(yy), sz);
     }
     for(let y=HZ;y<BASE_H;y++){
       const t=Math.sqrt(Math.max(0,(y-HZ)/(BASE_H+50-HZ)));
@@ -950,7 +1052,7 @@
     for(const hk of G.hawks){
       if(hk.dead) continue;
       const prog=Math.max(0,Math.min(1,(hk.y-(HZ-8))/(bY-(HZ-8))));
-      const sc=0.7+prog*1.9;
+      const sc=1.0+prog*2.1;                           // bigger -> clearly visible diving in from the sky
       if(hk.t<0.9){                                  // red targeting blink during the telegraph
         bx.globalAlpha=0.45+0.45*Math.sin(G.t*18); bx.strokeStyle='#ff5566'; bx.lineWidth=2;
         bx.beginPath(); bx.arc(hk.x, hk.y, 11, 0, Math.PI*2); bx.stroke(); bx.globalAlpha=1;
@@ -1000,12 +1102,13 @@
   function frame(ts){
     raf=requestAnimationFrame(frame);
     if(!last) last=ts; let dt=(ts-last)/1000; last=ts; if(dt>0.05) dt=0.05;
+    updateClouds(dt);                               // clouds drift on every screen, even the title
     if(G.state==='play'||G.state==='capsize') update(dt);
     render();
   }
 
   /* ===== screen flow ===== */
-  const LAYERS=['scrTitle','scrPlayers','scrInitials','scrPass','scrResults','scrBoard'];
+  const LAYERS=['scrTitle','scrPlayers','scrInitials','scrPass','scrResults','scrBoard','scrRules'];
   function show(which){
     LAYERS.forEach(id=> $(id).classList.toggle('hidden', id!==which));
     const playing=(which==='play');
@@ -1147,6 +1250,8 @@
   // menu buttons
   $('btnStart').addEventListener('click', ()=>{ AudioFX.ensure(); AudioFX.resume(); AudioFX.select(); show('scrPlayers'); });
   $('btnBoard').addEventListener('click', ()=>{ AudioFX.ensure(); AudioFX.resume(); openBoard('scrTitle'); });
+  $('btnRules').addEventListener('click', ()=>{ AudioFX.ensure(); AudioFX.resume(); AudioFX.select(); show('scrRules'); });
+  $('btnRulesBack').addEventListener('click', ()=>{ AudioFX.select(); show('scrTitle'); });
   $('btn1p').addEventListener('click', ()=> chooseMode(1));
   $('btn2p').addEventListener('click', ()=> chooseMode(2));
   $('btnPlayersBack').addEventListener('click', ()=> show('scrTitle'));

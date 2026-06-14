@@ -261,6 +261,7 @@
     k:'#140d18', // outline
     r:'#c0392b', R:'#7a1d10', w:'#caa15a', W:'#8a6a35', m:'#586074', M:'#3a4256',
     f:'#eaf6ff',
+    j:'#ff3b1e', J:'#ff8a1e',  // engine flame: red-orange / orange (yellow core reuses 'y')
     // driver (pink hair)
     p:'#ff6fae', P:'#d84f8e', s:'#f1c79a', b:'#37c6ff',
     // sidekick (captain hat)
@@ -278,15 +279,15 @@
   // Combined boat (rear view) with two riders. 32 wide.
   const SPR_BOAT = [
     "................................",
-    "..........kk........kk..........",
-    ".........khhk......kppk.........",
-    "........khhhhk.....kppk.........",
-    "........kxxxxk.....kpppk........",
-    "........ksssgk.....ksssk........",
-    "........kssssk.....kssssk.......",
-    ".......kknnnnkk...kkbbbbkk......",
-    ".......knnnnnnk...kbbbbbbbk.....",
-    ".......knnnnnnk...kbbbbbbbk.....",
+    "................................",
+    "........hhh........pppp.........",
+    ".......khhhhk.....pppppp........",
+    ".......kxgxk......pesesp........",
+    "........kssk......pksksp........",
+    "........kssk......pssssp........",
+    ".......knnnnk....kkbbbbkk.......",
+    "......knnnnnnk...kbbbbbbk.......",
+    "......knnnnnnk...kbbbbbbk.......",
     "....kkkkkkkkkkkkkkkkkkkkkkk.....",
     "...kwwwwwwwwwwwwwwwwwwwwwwwwk...",
     "..kwWWwwwwwwwwwwwwwwwwwwwWWwwk..",
@@ -492,15 +493,15 @@
   function scaleAt(t){ return 0.45 + 2.0*t; }                // sprite grows as it nears
   // ----- river bend: the channel centerline drifts horizontally. Strong at the horizon
   // (so a bend is telegraphed well ahead) and gentle near the boat, so curves are fair. -----
-  const BEND_AMP = 22;
-  function bendPx(t){ return G.curve * BEND_AMP * (1 - 0.7*t); }
+  const BEND_AMP = 38;          // bigger max swing -> genuinely sharp corners
+  function bendPx(t){ return G.curve * BEND_AMP * (1 - 0.82*t); }   // strong at horizon, gentle near the boat (fair)
   function cxAt(t){ return CX + bendPx(t); }
   function xAt(xRel, t){ return cxAt(t) + xRel*halfW(t); }
 
   /* ===== game state ===== */
   const G = { state:'title', score:0, dist:0, best:0, lives:3,
               boatX:0, vx:0, inv:0, items:[], spawnT:0, speed:0, t:0, shake:0,
-              curve:0, curveTarget:0, curveTimer:0,
+              curve:0, curveTarget:0, curveTimer:0, curveEase:0.8,
               airborne:false, jumpH:0, jumpVel:0, squashY:1 };
   try{ G.best = parseInt(localStorage.getItem('boat_best')||'0',10)||0; }catch(e){}
 
@@ -512,21 +513,21 @@
   const STEER_MAX = 0.30;       // was 1.7  — lower top cross-river speed
   const STEER_FRICTION = 0.80;  // was 0.86 — more damping = smoother, less twitchy
   // ----- jump (vertical hop; airborne clears obstacles) -----
-  const JUMP_V0 = 168, GRAVITY = 560;   // ~0.6s hop, ~25px apex
+  const JUMP_V0 = 220, GRAVITY = 440;   // BIG hop: apex ~55px, ~1.0s airtime (ramp jumps bigger still)
   function doJump(){
     if(G.state!=='play' || G.airborne) return;
-    G.airborne=true; G.jumpVel=JUMP_V0; G.jumpH=0.001; G.squashY=1.30;
+    G.airborne=true; G.jumpVel=JUMP_V0; G.jumpH=0.001; G.squashY=1.36;
     AudioFX.jump();
   }
   function landBoat(){
-    G.airborne=false; G.jumpH=0; G.jumpVel=0; G.squashY=0.74;
+    G.airborne=false; G.jumpH=0; G.jumpVel=0; G.squashY=0.70;
     AudioFX.land();
   }
 
   function reset(){
     G.score=0; G.dist=0; G.lives=3; G.boatX=0; G.vx=0; G.inv=0;
     G.items.length=0; G.spawnT=0.6; G.speed=0.34; G.t=0; G.shake=0;
-    G.curve=0; G.curveTarget=0; G.curveTimer=2.5;
+    G.curve=0; G.curveTarget=0; G.curveTimer=2.5; G.curveEase=0.8;
     G.airborne=false; G.jumpH=0; G.jumpVel=0; G.squashY=1;
     held.left=held.right=false;
     updateHUD();
@@ -571,11 +572,14 @@
     G.curveTimer -= dt;
     if(G.curveTimer<=0){
       const prev = G.curveTarget;
-      G.curveTarget = (Math.random()*1.8 - 0.9);
-      G.curveTimer = 3.2 + Math.random()*3.0;
-      if(Math.abs(G.curveTarget-prev) > 0.4) AudioFX.turn();
+      const sharp = Math.random() < 0.35;                                   // ~1 in 3 is a sharp corner
+      const mag = sharp ? (1.05 + Math.random()*0.55) : (Math.random()*0.7); // sharp 1.05-1.6, gentle 0-0.7
+      G.curveTarget = (Math.random()<0.5 ? -1 : 1) * mag;
+      G.curveEase = sharp ? 1.6 : 0.8;                                      // sharp swings in quicker (still telegraphed)
+      G.curveTimer = sharp ? (1.8 + Math.random()*1.6) : (3.0 + Math.random()*3.0);
+      if(sharp || Math.abs(G.curveTarget-prev) > 0.5) AudioFX.turn();
     }
-    G.curve += (G.curveTarget - G.curve) * Math.min(1, dt*0.8);   // slow ease-in = readable
+    G.curve += (G.curveTarget - G.curve) * Math.min(1, dt*G.curveEase);     // ease-in = readable/telegraphed
 
     // jump physics (vertical hop; airborne clears obstacles)
     if(G.airborne){
@@ -684,12 +688,21 @@
     }
   }
 
+  // small animated engine flame (hot motor) — flickers + jitters; bigger while accelerating/airborne
+  function drawFlame(fx, fy, big){
+    const j = (Math.random()*3|0) - 1;              // -1..1 horizontal jitter
+    const ex = (Math.floor(G.t*16)%2) ? 1 : 0;      // 2-frame flicker
+    const tip = (big?2:0) + ex;                     // extra length when accelerating/airborne
+    bx.fillStyle = PAL.j; bx.fillRect(fx-1+j, fy,   3, 2);          // red-orange shoulders
+    bx.fillStyle = PAL.J; bx.fillRect(fx+j,   fy-1, 1, 3);          // orange body
+    bx.fillStyle = PAL.y; bx.fillRect(fx+j,   fy,   1, 2+tip);      // bright yellow core
+  }
   function drawBoat(){
     const t=0.9, groundY=yAt(t)-6, x=xAt(G.boatX,t);
     const h = G.jumpH;                       // px above the water
     const y = groundY - h;
-    // shadow on the water (shrinks as the boat rises)
-    const shW = Math.max(6, 26*(1 - Math.min(0.7, h/46)));
+    // shadow on the water (shrinks as the boat rises higher on the bigger jumps)
+    const shW = Math.max(6, 26*(1 - Math.min(0.78, h/80)));
     bx.fillStyle='rgba(8,20,40,0.30)';
     bx.beginPath(); bx.ellipse(x, groundY+10, shW/2, 3, 0, 0, Math.PI*2); bx.fill();
     // blink during invulnerability
@@ -705,6 +718,10 @@
     }
     // squash & stretch via non-uniform pixel blocks (taller on launch, flatter on land)
     drawSprite(SPR_BOAT, x, y, 2*(2-G.squashY), 2*G.squashY);
+    // engine exhaust flame at the two stern motors (drawn over the hull edge; bigger while accelerating/airborne)
+    const hot = held.left || held.right || G.airborne;
+    drawFlame(Math.round(x-8), Math.round(y+16), hot);
+    drawFlame(Math.round(x+5), Math.round(y+16), hot);
   }
 
   function render(){

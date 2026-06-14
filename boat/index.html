@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>BOAT</title>
+<link rel="icon" type="image/png" href="/gfx/eggman_final.png" />
+<style>
+  :root{ color-scheme: dark; --ink:#0a0c1a; }
+  *{ box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body{ margin:0; height:100%; overscroll-behavior:none; background:#05060f; }
+  body{
+    min-height:100%; height:100svh; height:100dvh; overflow:hidden;
+    color:#fff; font-family:"Trebuchet MS","Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;
+    -webkit-user-select:none; user-select:none; touch-action:none;
+  }
+  #wrap{ position:fixed; inset:0; display:block; }
+  /* Pixel canvas fills the viewport; the low-res buffer is integer-scaled onto it. */
+  #screen{ position:absolute; inset:0; width:100%; height:100%; display:block;
+           image-rendering:pixelated; image-rendering:crisp-edges; background:#0a0c1a; }
+
+  /* ---- overlays ---- */
+  .layer{ position:absolute; inset:0; display:flex; flex-direction:column;
+          align-items:center; justify-content:center; text-align:center;
+          padding:max(20px,env(safe-area-inset-top)) 18px max(20px,env(safe-area-inset-bottom));
+          gap:16px; }
+  .hidden{ display:none !important; }
+  .pixfont{ font-family:"Courier New",monospace; font-weight:900; letter-spacing:2px; }
+  h1.title{ margin:0; font-size:clamp(48px,20vw,108px); line-height:.9;
+    color:#ffd23f; text-shadow:0 4px 0 #c0392b, 0 8px 0 #7a1d10, 0 9px 18px rgba(0,0,0,.6);
+    -webkit-text-stroke:2px #2a1206; }
+  .tagline{ margin:0; color:#9fe6ff; font-size:clamp(13px,4vw,17px); letter-spacing:1px; }
+  .card{ background:rgba(8,12,30,.72); border:2px solid #2b3566; border-radius:16px;
+    padding:14px 18px; max-width:330px; line-height:1.5; font-size:14px; color:#cdd6ff; }
+  .card b{ color:#ffd23f; }
+  .btn{ font-family:inherit; cursor:pointer; border:none; border-radius:14px;
+    min-height:58px; padding:14px 34px; font-size:clamp(20px,6vw,26px); font-weight:900;
+    letter-spacing:2px; text-transform:uppercase; color:#05060f;
+    background:linear-gradient(90deg,#37ffb0,#00e0ff); box-shadow:0 8px 24px rgba(0,224,255,.4);
+    transition:transform .08s ease; }
+  .btn:active{ transform:translateY(2px) scale(.98); }
+  .btn.alt{ background:linear-gradient(90deg,#ff3b6b,#ffd23f); color:#1a0008; box-shadow:0 8px 24px rgba(255,59,107,.4); }
+  .small{ color:#8b93c0; font-size:12px; }
+  #goScore{ font-size:clamp(40px,13vw,68px); margin:0; color:#fff; }
+  #goBest{ margin:0; color:#ffd23f; font-size:18px; }
+
+  /* ---- in-game HUD ---- */
+  #hud{ position:absolute; left:0; right:0; top:0; display:flex; justify-content:space-between;
+    align-items:flex-start; padding:max(10px,env(safe-area-inset-top)) 14px 0; pointer-events:none; }
+  #hearts{ display:flex; gap:4px; }
+  .heart{ width:20px; height:20px; image-rendering:pixelated; }
+  #scoreWrap{ text-align:right; }
+  #score{ font-size:26px; font-weight:900; color:#fff; text-shadow:0 2px 0 #000; }
+  #best{ font-size:12px; color:#ffd23f; letter-spacing:1px; }
+
+  /* ---- touch controls ---- */
+  #pad{ position:absolute; left:0; right:0; bottom:0; display:flex; justify-content:space-between;
+    padding:0 14px max(18px,env(safe-area-inset-bottom)); pointer-events:none; }
+  .dbtn{ pointer-events:auto; width:clamp(96px,30vw,140px); height:clamp(96px,30vw,140px);
+    border-radius:24px; border:3px solid rgba(255,255,255,.35); background:rgba(10,16,40,.42);
+    color:#fff; font-size:48px; font-weight:900; display:flex; align-items:center; justify-content:center;
+    backdrop-filter:blur(2px); transition:transform .06s, background .1s; }
+  .dbtn:active{ background:rgba(0,224,255,.35); transform:scale(.96); }
+
+  /* ---- mute ---- */
+  #mute{ position:absolute; top:max(8px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
+    pointer-events:auto; background:rgba(8,12,30,.6); border:2px solid #2b3566; color:#cdd6ff;
+    border-radius:10px; font-size:13px; font-weight:700; padding:6px 12px; cursor:pointer; letter-spacing:1px; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="screen"></canvas>
+
+  <!-- HUD (visible while playing) -->
+  <div id="hud" class="hidden">
+    <div id="hearts"></div>
+    <div id="scoreWrap"><div id="score">0</div><div id="best">BEST 0</div></div>
+  </div>
+
+  <!-- touch d-pad -->
+  <div id="pad" class="hidden">
+    <button class="dbtn" id="btnLeft" aria-label="left">&#9664;</button>
+    <button class="dbtn" id="btnRight" aria-label="right">&#9654;</button>
+  </div>
+
+  <button id="mute" class="hidden">&#128266; SOUND</button>
+
+  <!-- TITLE -->
+  <div id="scrTitle" class="layer">
+    <h1 class="title pixfont">BOAT</h1>
+    <p class="tagline pixfont">an endless river run</p>
+    <div class="card">
+      Steer down the river. <b>Dodge</b> rocks, logs &amp; buoys.
+      <b>Grab</b> eggs, hotdogs &amp; friends for points.
+      <br><br>
+      <b>&#9664; / &#9654;</b> or arrow keys to steer. 3 lives. Go far.
+    </div>
+    <button class="btn" id="btnStart">START</button>
+    <p class="small pixfont">a Sass Attack joint</p>
+  </div>
+
+  <!-- GAME OVER -->
+  <div id="scrOver" class="layer hidden">
+    <h1 class="title pixfont" style="font-size:clamp(34px,12vw,64px)">GAME&nbsp;OVER</h1>
+    <p id="goScore" class="pixfont">0</p>
+    <p id="goBest" class="pixfont">BEST 0</p>
+    <button class="btn alt" id="btnAgain">RUN AGAIN</button>
+    <p class="small pixfont">local high score only &mdash; for now</p>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+
+  /* ===== immersive / fullscreen (best effort, never throws) ===== */
+  function goImmersive(){
+    try{ const el=document.documentElement;
+      const rfs=el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen;
+      if(rfs){ const pr=rfs.call(el); if(pr&&pr.catch) pr.catch(()=>{}); }
+    }catch(e){}
+    try{ if(screen.orientation&&screen.orientation.lock){ const po=screen.orientation.lock('portrait'); if(po&&po.catch) po.catch(()=>{}); } }catch(e){}
+  }
+
+  /* =====================================================================
+     AUDIO — everything synthesized via Web Audio (no audio files).
+     SFX: pickup chime / hit / life-lost / game-over / start.
+     Music: a light, loopable chiptune bed (paddling groove) while playing.
+     Master mute toggle persisted in localStorage ('boat_muted').
+     ===================================================================== */
+  const AudioFX = (() => {
+    let ctx=null, master=null, muted=false;
+    try{ muted = localStorage.getItem('boat_muted')==='1'; }catch(e){}
+
+    function ensure(){
+      if(ctx) return ctx;
+      try{
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if(!AC) return null;
+        ctx = new AC();
+        master = ctx.createGain();
+        master.gain.value = muted ? 0 : 0.9;
+        master.connect(ctx.destination);
+      }catch(e){ ctx=null; }
+      return ctx;
+    }
+    function resume(){ try{ if(ctx && ctx.state!=='running') ctx.resume(); }catch(e){} }
+
+    function tone(freq,dur,type,peak,slideTo,delay){
+      if(!ensure()||muted) return;
+      const t = ctx.currentTime + (delay||0);
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.type=type||'square';
+      o.frequency.setValueAtTime(freq,t);
+      if(slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(1,slideTo), t+dur);
+      g.gain.setValueAtTime(0.0001,t);
+      g.gain.exponentialRampToValueAtTime(peak||0.16, t+0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
+      o.connect(g); g.connect(master);
+      o.start(t); o.stop(t+dur+0.03);
+    }
+    function arp(freqs,step,dur,type,peak){ freqs.forEach((f,i)=>tone(f,dur,type,peak,null,i*step)); }
+    function noise(dur,peak,delay){
+      if(!ensure()||muted) return;
+      const t=ctx.currentTime+(delay||0);
+      const n=Math.floor(ctx.sampleRate*dur);
+      const buf=ctx.createBuffer(1,n,ctx.sampleRate), d=buf.getChannelData(0);
+      for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*(1-i/n);
+      const src=ctx.createBufferSource(); src.buffer=buf;
+      const g=ctx.createGain(); g.gain.value=peak||0.2;
+      const f=ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=1400;
+      src.connect(f); f.connect(g); g.connect(master); src.start(t);
+    }
+
+    // --- SFX ---
+    const pickup   = () => arp([784, 988, 1319], 0.06, 0.14, 'square', 0.15);            // bright chime up
+    const bonus    = () => arp([659,880,1175,1568], 0.05, 0.14, 'triangle', 0.16);
+    const hit      = () => { noise(0.22,0.30); tone(150,0.26,'sawtooth',0.22,60); };      // crunch
+    const lifeLost = () => arp([392,294,196], 0.10, 0.22, 'square', 0.18);               // descending
+    const start    = () => arp([523,659,784,1046], 0.07, 0.18, 'square', 0.16);
+    const over     = () => { arp([330,262,196,131], 0.14, 0.34, 'triangle', 0.2);
+                             tone(98,0.7,'sawtooth',0.12,70,0.2); };
+
+    // --- background MUSIC: light chiptune paddling groove (loops) ---
+    let musicGain=null, loopTimer=null, bedOn=false, nextAt=0;
+    const BPM=120, BEAT=60/BPM, BAR=BEAT*4, LOOP=BAR*4;
+    const N={ C3:130.81,E3:164.81,G3:196,A3:220,B3:246.94,
+              C4:261.63,D4:293.66,E4:329.63,G4:392,A4:440,B4:493.88,C5:523.25,D5:587.33,E5:659.25 };
+    const BASS=['C3','C3','A3','A3','G3','G3','E3','E3','C3','C3','A3','A3','G3','G3','G3','B3'];
+    const LEAD=['C5','E5','G4','E5','A4','C5','E5','C5','G4','E5','D5','E5','G4','D5','B4','D5'];
+    function mnote(t0,freq,dur,type,peak){
+      if(muted||!ctx||!musicGain) return;
+      const o=ctx.createOscillator(), g=ctx.createGain();
+      o.type=type; o.frequency.setValueAtTime(freq,t0);
+      g.gain.setValueAtTime(0.0001,t0);
+      g.gain.exponentialRampToValueAtTime(peak,t0+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+      o.connect(g); g.connect(musicGain); o.start(t0); o.stop(t0+dur+0.05);
+    }
+    function playLoop(t0){
+      const step=BEAT/2;                 // eighth notes
+      for(let i=0;i<16;i++){
+        const t=t0+i*step;
+        mnote(t, N[BASS[i]], step*1.6, 'triangle', 0.10);          // bouncy bass
+        if(i%2===0) mnote(t, N[LEAD[i]], step*0.9, 'square', 0.07); // light lead
+        if(i%4===0) noise && null;
+      }
+      return LOOP;
+    }
+    function schedule(){
+      if(!bedOn||!ctx) return;
+      while(nextAt < ctx.currentTime + 0.3){ nextAt += playLoop(nextAt); }
+      loopTimer=setTimeout(schedule,120);
+    }
+    function startBed(){
+      stopBed(); bedOn=true;
+      if(!ensure()) return; resume();
+      try{ musicGain=ctx.createGain(); musicGain.gain.value=0.6; musicGain.connect(master); }catch(e){ musicGain=null; }
+      nextAt=ctx.currentTime+0.08; schedule();
+    }
+    function stopBed(){
+      bedOn=false;
+      if(loopTimer){ clearTimeout(loopTimer); loopTimer=null; }
+      if(musicGain&&ctx){ const mg=musicGain; musicGain=null;
+        try{ mg.gain.setTargetAtTime(0.0001,ctx.currentTime,0.05); }catch(e){}
+        setTimeout(()=>{ try{ mg.disconnect(); }catch(e){} },500);
+      } else musicGain=null;
+    }
+    function setMuted(m){
+      muted=m;
+      try{ localStorage.setItem('boat_muted', m?'1':'0'); }catch(e){}
+      if(master) master.gain.value = m?0:0.9;
+    }
+    return { ensure, resume, isMuted:()=>muted, setMuted,
+             pickup, bonus, hit, lifeLost, start, over, startBed, stopBed };
+  })();
+
+  /* =====================================================================
+     PIXEL ART — sprites are arrays of equal-length strings; each character
+     maps to a palette colour ('.' = transparent). They are drawn block-by
+     -block to the LOW-RES buffer, so every pixel stays chunky after the
+     buffer is integer-scaled up to the screen.
+     ===================================================================== */
+  const PAL = {
+    // boat / water / world
+    k:'#140d18', // outline
+    r:'#c0392b', R:'#7a1d10', w:'#caa15a', W:'#8a6a35', m:'#586074', M:'#3a4256',
+    f:'#eaf6ff',
+    // driver (pink hair)
+    p:'#ff6fae', P:'#d84f8e', s:'#f1c79a', b:'#37c6ff',
+    // sidekick (captain hat)
+    h:'#ffffff', x:'#1a1a2a', g:'#ffd23f', n:'#284a8a',
+    // obstacles
+    a:'#8a8f9c', A:'#5b606e', o:'#9c6b3b', O:'#6b4724', e:'#e8e8ee',
+    // pickups
+    y:'#ffe05a', Y:'#f4b73d', q:'#ff4d6d', Q:'#c0264a',
+    d:'#cfd6ff', D:'#9aa4d8', t:'#39d98a', T:'#2a9c63',
+    c:'#b7791f', u:'#7a4e10',
+    z:'#ff5cc8', Z:'#8a2be2', G:'#37ffb0',
+    l:'#7ad7ff'
+  };
+
+  // Combined boat (rear view) with two riders. 32 wide.
+  const SPR_BOAT = [
+    "................................",
+    "..........kk........kk..........",
+    ".........kppk......khhk.........",
+    ".........kppk.....khhhhk........",
+    "........kpppk.....kxxxxk........",
+    "........ksssk.....kgsssk........",
+    ".......kssssk.....kssssk........",
+    "......kkbbbbkk...kknnnnkk.......",
+    ".....kbbbbbbbk...knnnnnnk.......",
+    ".....kbbbbbbbk...knnnnnnk.......",
+    "....kkkkkkkkkkkkkkkkkkkkkkk.....",
+    "...kwwwwwwwwwwwwwwwwwwwwwwwwk...",
+    "..kwWWwwwwwwwwwwwwwwwwwwwWWwwk..",
+    "..kwwwwwwwwwwwwwwwwwwwwwwwwwwk..",
+    "..krrrrrrrrrrrrrrrrrrrrrrrrrrk..",
+    "..kRrrrrrrrrrrrrrrrrrrrrrrrrRk..",
+    "...kRRrrrrrrrrrrrrrrrrrrrrRRk...",
+    "....kRRRrrrrrrrrrrrrrrrrRRRk....",
+    ".....kkRRRRRRRRRRRRRRRRRRkk.....",
+    "......fk.kkmmkk..kkmmkk.kf......",
+    "......ffff.kMMk..kMMk.ffff......",
+    ".....ffffff.kk....kk.ffffff....."
+  ];
+
+  // ---- obstacles (small; scaled up by perspective) ----
+  const SPR_ROCK = [
+    "..AAAA..",
+    ".AaaaaA.",
+    "AaaaeaaA",
+    "AaeaaaaA",
+    "AaaaaaaA",
+    ".AAaaAA.",
+    "..AAAA..",
+    "........"
+  ];
+  const SPR_LOG = [
+    "................",
+    ".kOOOOOOOOOOOOk.",
+    "kOoooooooooooOk.",
+    "kOoOoooOoooOooOk",
+    "kOoooOooooOoooOk",
+    "kOoooooooooooOk.",
+    ".kOOOOOOOOOOOOk.",
+    "................"
+  ];
+  const SPR_BUOY = [
+    "...kk...",
+    "..keek..",
+    ".kqqqqk.",
+    ".keeeek.",
+    ".kqqqqk.",
+    ".kMMMMk.",
+    "..kMMk..",
+    "..ffff.."
+  ];
+
+  // ---- pickups (callbacks to the other games) ----
+  const SPR_EGG = [   // Sass Attack
+    "..eee...",
+    ".eeeee..",
+    "eeeYeee.",
+    "eeYYYee.",
+    "eeeYeee.",
+    "eeeeee..",
+    ".eeee...",
+    "........"
+  ];
+  const SPR_HOTDOG = [ // Sass Attack / NG
+    "........",
+    ".yyyyyy.",
+    "yqqqqqqy",
+    "yqkqqkqy",
+    "yqqqqqqy",
+    ".yyyyyy.",
+    "........",
+    "........"
+  ];
+  const SPR_SANDWICH = [ // WUH / Sandwiches of History
+    ".wwwwww.",
+    "wWWWWWWw",
+    "wtttttw.",
+    ".qqqqq..",
+    "weeeeew.",
+    "wWWWWWWw",
+    ".wwwww..",
+    "........"
+  ];
+  const SPR_DISCO = [   // SNL
+    "..dddd..",
+    ".dDdDdD.",
+    "dDdDdDdD",
+    "dDdDdDdD",
+    "dDdDdDdD",
+    ".dDdDdD.",
+    "..dddd..",
+    "...k...."
+  ];
+  const SPR_COWBELL = [ // SNL (more cowbell)
+    "..cc....",
+    ".cccc...",
+    ".cuuc...",
+    "ccuucc..",
+    "ccuucc..",
+    "cccccc..",
+    ".cuuc...",
+    "........"
+  ];
+  const SPR_PUZZLE = [  // GYUH
+    "..G.G...",
+    ".GGGGG..",
+    "GGGGGGG.",
+    "GGGGGGG.",
+    ".GGGGG..",
+    "GG.G.GG.",
+    "G..G..G.",
+    "........"
+  ];
+  const SPR_QBLOCK = [  // WUH? trivia
+    "kkkkkkkk",
+    "kyyyyyyk",
+    "kyykkyyk",
+    "kyykyyyk",
+    "kyyykyyk",
+    "kyyykyyk",
+    "kyyyyyyk",
+    "kkkkkkkk"
+  ];
+  // give "?" block a dark "?" — overwrite a couple cells already done above.
+
+  const SPR_HEART = [
+    ".qq.qq.",
+    "qqqqqqq",
+    "qqqqqqq",
+    ".qqqqq.",
+    "..qqq..",
+    "...q...",
+    "......."
+  ];
+
+  const PICKUPS = [
+    { spr:SPR_EGG,      pts:50,  label:'EGG' },
+    { spr:SPR_HOTDOG,   pts:50,  label:'HOTDOG' },
+    { spr:SPR_SANDWICH, pts:75,  label:'SANDWICH' },
+    { spr:SPR_DISCO,    pts:100, label:'DISCO' },
+    { spr:SPR_COWBELL,  pts:75,  label:'COWBELL' },
+    { spr:SPR_PUZZLE,   pts:75,  label:'PUZZLE' },
+    { spr:SPR_QBLOCK,   pts:100, label:'QBLOCK' }
+  ];
+  const OBSTACLES = [ SPR_ROCK, SPR_LOG, SPR_BUOY ];
+
+  /* ===== buffer / scaling ===== */
+  const screen = $('screen');
+  const sctx = screen.getContext('2d');
+  sctx.imageSmoothingEnabled = false;
+
+  const BASE_W = 160, BASE_H = 288;          // low-res internal resolution (5:9-ish portrait)
+  const buf = document.createElement('canvas');
+  buf.width = BASE_W; buf.height = BASE_H;
+  const bx = buf.getContext('2d');
+  bx.imageSmoothingEnabled = false;
+
+  let dpr=1, viewScale=1, offX=0, offY=0;
+  function resize(){
+    dpr = Math.min(window.devicePixelRatio||1, 3);
+    const cw = window.innerWidth, ch = window.innerHeight;
+    screen.style.width = cw+'px'; screen.style.height = ch+'px';
+    screen.width = Math.floor(cw*dpr); screen.height = Math.floor(ch*dpr);
+    sctx.imageSmoothingEnabled = false;
+    // integer scale of the buffer that fits the device-pixel screen
+    viewScale = Math.max(1, Math.floor(Math.min(screen.width/BASE_W, screen.height/BASE_H)));
+    offX = Math.floor((screen.width  - BASE_W*viewScale)/2);
+    offY = Math.floor((screen.height - BASE_H*viewScale)/2);
+  }
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', ()=>setTimeout(resize,120));
+  resize();
+
+  // draw a sprite into the buffer at integer block-size `sc`, centered on (cx,cy)
+  function drawSprite(spr, cx, cy, sc){
+    sc = Math.max(1, Math.round(sc));
+    const h = spr.length, w = spr[0].length;
+    const x0 = Math.round(cx - (w*sc)/2), y0 = Math.round(cy - (h*sc)/2);
+    for(let r=0;r<h;r++){
+      const row = spr[r];
+      for(let c=0;c<w;c++){
+        const ch = row[c];
+        if(ch==='.'){ continue; }
+        const col = PAL[ch]; if(!col) continue;
+        bx.fillStyle = col;
+        bx.fillRect(x0 + c*sc, y0 + r*sc, sc, sc);
+      }
+    }
+  }
+
+  /* ===== river perspective ===== */
+  const HZ = 84;                       // horizon line (y in buffer)
+  const CX = BASE_W/2;
+  const TOPW = 12, BOTW = 74;          // river half-width at horizon vs at camera
+  function yAt(t){ return HZ + (BASE_H+24 - HZ) * (t*t); }   // accelerate toward camera
+  function halfW(t){ return TOPW + (BOTW-TOPW)*t; }
+  function scaleAt(t){ return 0.45 + 2.0*t; }                // sprite grows as it nears
+  function xAt(xRel, t){ return CX + xRel*halfW(t); }
+
+  /* ===== game state ===== */
+  const G = { state:'title', score:0, dist:0, best:0, lives:3,
+              boatX:0, vx:0, inv:0, items:[], spawnT:0, speed:0, t:0, shake:0 };
+  try{ G.best = parseInt(localStorage.getItem('boat_best')||'0',10)||0; }catch(e){}
+
+  const held = { left:false, right:false };
+  let waterPhase = 0;
+
+  function reset(){
+    G.score=0; G.dist=0; G.lives=3; G.boatX=0; G.vx=0; G.inv=0;
+    G.items.length=0; G.spawnT=0.6; G.speed=0.34; G.t=0; G.shake=0;
+    held.left=held.right=false;
+    updateHUD();
+  }
+
+  function spawn(){
+    const isPickup = Math.random() < 0.42;
+    const xRel = (Math.random()*1.5 - 0.75);
+    if(isPickup){
+      const p = PICKUPS[(Math.random()*PICKUPS.length)|0];
+      G.items.push({ kind:'pick', spr:p.spr, pts:p.pts, xRel, t:0, hw:8, gone:false });
+    } else {
+      const o = OBSTACLES[(Math.random()*OBSTACLES.length)|0];
+      G.items.push({ kind:'obs', spr:o, xRel, t:0, hw: o===SPR_LOG?16:8, gone:false });
+    }
+  }
+
+  function update(dt){
+    G.t += dt;
+    // difficulty ramp: speed + spawn rate climb with distance
+    G.speed = 0.34 + Math.min(0.85, G.dist/2600);
+    const spawnEvery = Math.max(0.42, 0.95 - G.dist/3200);
+    waterPhase += dt * (1.2 + G.speed*2);
+
+    // distance scoring
+    G.dist += G.speed * dt * 60;
+    G.score += G.speed * dt * 60 * 0.6;
+
+    // steering (held = continuous)
+    const dir = (held.left?-1:0) + (held.right?1:0);
+    const acc = 3.4, max = 1.7;
+    G.vx += dir*acc*dt;
+    G.vx *= 0.86;                                   // friction
+    if(Math.abs(G.vx)>max) G.vx = Math.sign(G.vx)*max;
+    G.boatX += G.vx;
+    const lim = 0.86;
+    if(G.boatX> lim){ G.boatX= lim; G.vx*=-0.3; }
+    if(G.boatX<-lim){ G.boatX=-lim; G.vx*=-0.3; }
+
+    if(G.inv>0) G.inv -= dt;
+    if(G.shake>0) G.shake -= dt;
+
+    // spawn
+    G.spawnT -= dt;
+    if(G.spawnT<=0){ spawn(); G.spawnT = spawnEvery * (0.7+Math.random()*0.6); }
+
+    // advance items toward camera
+    const boatT = 0.9;
+    for(const it of G.items){
+      if(it.gone) continue;
+      it.t += G.speed * dt;
+      if(it.t > 1.18){ it.gone=true; continue; }
+      // collision band near the boat
+      if(it.t>0.80 && it.t<0.99 && !it.hit){
+        const dxRel = Math.abs(it.xRel - G.boatX);
+        const thresh = it.kind==='obs' ? (it.hw/BOTW + 0.14) : (it.hw/BOTW + 0.10);
+        if(dxRel < thresh){
+          it.hit = true;
+          if(it.kind==='pick'){
+            it.gone=true;
+            G.score += it.pts;
+            (it.pts>=100 ? AudioFX.bonus : AudioFX.pickup)();
+            it.pop = 0.0;
+          } else if(G.inv<=0){
+            it.gone=true;
+            G.lives--;
+            G.inv = 1.4;                  // invulnerable + blink window
+            G.shake = 0.35;
+            AudioFX.hit();
+            if(G.lives<=0){ gameOver(); return; }
+            else AudioFX.lifeLost();
+          }
+        }
+      }
+    }
+    // prune
+    if(G.items.length>60) G.items = G.items.filter(i=>!i.gone);
+
+    G.score = Math.max(0, G.score);
+    updateHUD();
+  }
+
+  /* ===== drawing ===== */
+  function drawWater(){
+    // sky / distant bank above horizon
+    let grad = bx.createLinearGradient(0,0,0,HZ);
+    grad.addColorStop(0,'#1a2a55'); grad.addColorStop(1,'#3b5ea8');
+    bx.fillStyle = grad; bx.fillRect(0,0,BASE_W,HZ);
+    // tree line silhouette on the horizon
+    bx.fillStyle = '#173a2a';
+    for(let x=0;x<BASE_W;x+=6){
+      const hh = 4 + ((x*7)%5);
+      bx.fillRect(x, HZ-hh, 6, hh);
+    }
+    // grassy banks fill (whole lower area), river trapezoid carved on top
+    bx.fillStyle = '#1f7a3a'; bx.fillRect(0,HZ,BASE_W,BASE_H-HZ);
+    // bank texture rows
+    bx.fillStyle = '#176030';
+    for(let y=HZ;y<BASE_H;y+=6){ bx.fillRect(0,y,BASE_W,2); }
+
+    // river: filled with animated horizontal water bands (perspective trapezoid)
+    for(let y=HZ;y<BASE_H;y++){
+      const t = Math.sqrt(Math.max(0,(y-HZ)/(BASE_H+24-HZ)));
+      const hw = halfW(t);
+      const wob = Math.sin((y*0.5)+waterPhase*3.0)*1.4*t;
+      let l = Math.round(CX - hw + wob), r = Math.round(CX + hw + wob);
+      // banded blue with scrolling ripples
+      const band = Math.sin(y*0.6 + waterPhase*4.0 + t*3);
+      bx.fillStyle = band>0 ? '#2f8fd6' : '#2477b8';
+      bx.fillRect(l, y, r-l, 1);
+      // sparkle ripple dashes
+      if(((y + Math.floor(waterPhase*8)) % 7)===0){
+        bx.fillStyle = '#7ad7ff';
+        const sx = l + ((Math.sin(y*1.3+waterPhase*2)*0.5+0.5)*(r-l))|0;
+        bx.fillRect(sx, y, 2, 1);
+      }
+      // foam edges where water meets bank
+      bx.fillStyle = '#bfe9ff';
+      bx.fillRect(l-1,y,1,1); bx.fillRect(r,y,1,1);
+    }
+  }
+
+  function drawItems(){
+    // draw far -> near so nearer items overlap
+    const arr = G.items.filter(i=>!i.gone).sort((a,b)=>a.t-b.t);
+    for(const it of arr){
+      const y = yAt(it.t), x = xAt(it.xRel, it.t), sc = scaleAt(it.t);
+      // little shadow on the water
+      bx.fillStyle = 'rgba(8,20,40,0.25)';
+      const sw = it.spr[0].length*Math.round(sc);
+      bx.fillRect(Math.round(x-sw/2), Math.round(y+it.spr.length*Math.round(sc)/2-1), sw, 2);
+      drawSprite(it.spr, x, y, sc);
+    }
+  }
+
+  function drawBoat(){
+    const t=0.9, y=yAt(t)-6, x=xAt(G.boatX,t);
+    // blink during invulnerability
+    const blink = G.inv>0 && (Math.floor(G.t*16)%2===0);
+    if(blink) return;
+    // wake foam behind/under the boat
+    bx.fillStyle='#dff4ff';
+    for(let i=0;i<5;i++){
+      const fy=y+12+i*2, fw=10-i;
+      bx.fillRect(Math.round(x-fw), fy, fw*2, 1);
+    }
+    drawSprite(SPR_BOAT, x, y, 2);
+  }
+
+  function render(){
+    bx.clearRect(0,0,BASE_W,BASE_H);
+    drawWater();
+    drawItems();
+    drawBoat();
+
+    // blit buffer -> screen, integer scaled & centered, with optional shake
+    let sx=offX, sy=offY;
+    if(G.shake>0){ sx += (Math.random()*2-1)*viewScale; sy += (Math.random()*2-1)*viewScale; }
+    sctx.fillStyle = '#05060f';
+    sctx.fillRect(0,0,screen.width,screen.height);
+    sctx.drawImage(buf, 0,0,BASE_W,BASE_H, sx,sy, BASE_W*viewScale, BASE_H*viewScale);
+  }
+
+  /* ===== HUD ===== */
+  function heartSVG(){ return ''; }
+  function updateHUD(){
+    $('score').textContent = Math.floor(G.score).toLocaleString();
+    $('best').textContent = 'BEST ' + Math.floor(G.best).toLocaleString();
+    const hc = $('hearts'); hc.innerHTML='';
+    for(let i=0;i<G.lives;i++){
+      const cv=document.createElement('canvas'); cv.width=7; cv.height=7; cv.className='heart';
+      const c=cv.getContext('2d');
+      for(let r=0;r<SPR_HEART.length;r++) for(let col=0;col<SPR_HEART[r].length;col++){
+        const ch=SPR_HEART[r][col]; if(ch==='.') continue;
+        c.fillStyle = PAL[ch]||'#fff'; c.fillRect(col,r,1,1);
+      }
+      hc.appendChild(cv);
+    }
+  }
+
+  /* ===== loop ===== */
+  let last=0, raf=0;
+  function frame(ts){
+    raf = requestAnimationFrame(frame);
+    if(!last) last=ts;
+    let dt=(ts-last)/1000; last=ts;
+    if(dt>0.05) dt=0.05;                 // clamp big gaps
+    if(G.state==='play') update(dt);
+    if(G.state==='play' || G.state==='title') waterPhase += 0; // keep
+    render();
+  }
+
+  /* ===== screen flow ===== */
+  function show(which){
+    $('scrTitle').classList.toggle('hidden', which!=='title');
+    $('scrOver').classList.toggle('hidden', which!=='over');
+    $('hud').classList.toggle('hidden', which!=='play');
+    $('pad').classList.toggle('hidden', which!=='play');
+    $('mute').classList.toggle('hidden', which==='play'?false:false); // mute always visible except none
+    $('mute').classList.toggle('hidden', false);
+  }
+
+  function startGame(){
+    AudioFX.ensure(); AudioFX.resume(); AudioFX.start();
+    goImmersive();
+    reset();
+    G.state='play';
+    show('play');
+    AudioFX.startBed();
+  }
+  function gameOver(){
+    G.state='over';
+    AudioFX.stopBed(); AudioFX.over();
+    if(G.score>G.best){ G.best=Math.floor(G.score); try{ localStorage.setItem('boat_best', String(G.best)); }catch(e){} }
+    $('goScore').textContent = Math.floor(G.score).toLocaleString();
+    $('goBest').textContent = 'BEST ' + Math.floor(G.best).toLocaleString();
+    show('over');
+  }
+
+  /* ===== input ===== */
+  function bindHold(btn, side){
+    const on =e=>{ e.preventDefault(); held[side]=true; AudioFX.ensure(); AudioFX.resume(); };
+    const off=e=>{ e.preventDefault(); held[side]=false; };
+    btn.addEventListener('pointerdown',on);
+    btn.addEventListener('pointerup',off);
+    btn.addEventListener('pointerleave',off);
+    btn.addEventListener('pointercancel',off);
+    btn.addEventListener('touchstart',on,{passive:false});
+    btn.addEventListener('touchend',off,{passive:false});
+  }
+  bindHold($('btnLeft'),'left');
+  bindHold($('btnRight'),'right');
+
+  window.addEventListener('keydown', e=>{
+    if(e.key==='ArrowLeft'||e.key==='a'){ held.left=true; }
+    else if(e.key==='ArrowRight'||e.key==='d'){ held.right=true; }
+    else if((e.key===' '||e.key==='Enter')){
+      if(G.state==='title') startGame();
+      else if(G.state==='over') startGame();
+    }
+  });
+  window.addEventListener('keyup', e=>{
+    if(e.key==='ArrowLeft'||e.key==='a') held.left=false;
+    else if(e.key==='ArrowRight'||e.key==='d') held.right=false;
+  });
+
+  $('btnStart').addEventListener('click', startGame);
+  $('btnAgain').addEventListener('click', startGame);
+
+  const muteBtn=$('mute');
+  function paintMute(){ muteBtn.innerHTML = AudioFX.isMuted() ? '&#128263; MUTED' : '&#128266; SOUND'; }
+  muteBtn.addEventListener('click', ()=>{ AudioFX.setMuted(!AudioFX.isMuted()); paintMute(); AudioFX.ensure(); AudioFX.resume(); });
+  paintMute();
+
+  // robust resume-on-gesture safety net — unlock/resume the AudioContext on ANY gesture
+  ['pointerdown','touchstart','keydown'].forEach(ev=>
+    document.addEventListener(ev, ()=>{ AudioFX.ensure(); AudioFX.resume(); }, {passive:true}));
+
+  // boot
+  show('title');
+  updateHUD();
+  raf = requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<title>SassPack — BOAT</title>
+<title>SassPack &mdash; Chicken Rescue</title>
 <link rel="icon" type="image/png" href="/gfx/eggman_final.png" />
 <style>
   :root{ color-scheme: dark; --ink:#0a0c1a; }
@@ -18,24 +18,21 @@
     -webkit-user-select:none; user-select:none; touch-action:none;
   }
   #wrap{ position:fixed; inset:0; display:block; }
-  /* Pixel canvas fills the viewport; the low-res buffer is integer-scaled onto it. */
   #screen{ position:absolute; inset:0; width:100%; height:100%; display:block;
            image-rendering:pixelated; image-rendering:crisp-edges; background:#0a0c1a; }
-
-  /* ---- overlays ---- */
   .layer{ position:absolute; inset:0; display:flex; flex-direction:column;
           align-items:center; justify-content:center; text-align:center;
-          padding:max(20px,env(safe-area-inset-top)) 18px max(20px,env(safe-area-inset-bottom));
-          gap:16px; }
+          padding:max(20px,env(safe-area-inset-top)) 18px max(20px,env(safe-area-inset-bottom)); gap:16px; }
   .hidden{ display:none !important; }
   .pixfont{ font-family:"Courier New",monospace; font-weight:900; letter-spacing:2px; }
-  h1.title{ margin:0; font-size:clamp(48px,20vw,108px); line-height:.9;
+  h1.title{ margin:0; font-size:clamp(40px,14vw,86px); line-height:.92;
     color:#ffd23f; text-shadow:0 4px 0 #c0392b, 0 8px 0 #7a1d10, 0 9px 18px rgba(0,0,0,.6);
     -webkit-text-stroke:2px #2a1206; }
   .tagline{ margin:0; color:#9fe6ff; font-size:clamp(13px,4vw,17px); letter-spacing:1px; }
   .card{ background:rgba(8,12,30,.72); border:2px solid #2b3566; border-radius:16px;
-    padding:14px 18px; max-width:330px; line-height:1.5; font-size:14px; color:#cdd6ff; }
+    padding:14px 18px; max-width:340px; line-height:1.5; font-size:14px; color:#cdd6ff; }
   .card b{ color:#ffd23f; }
+  .card .chick{ color:#fff; }
   .btn{ font-family:inherit; cursor:pointer; border:none; border-radius:14px;
     min-height:58px; padding:14px 34px; font-size:clamp(20px,6vw,26px); font-weight:900;
     letter-spacing:2px; text-transform:uppercase; color:#05060f;
@@ -45,18 +42,18 @@
   .btn.alt{ background:linear-gradient(90deg,#ff3b6b,#ffd23f); color:#1a0008; box-shadow:0 8px 24px rgba(255,59,107,.4); }
   .small{ color:#8b93c0; font-size:12px; }
   #goScore{ font-size:clamp(40px,13vw,68px); margin:0; color:#fff; }
-  #goBest{ margin:0; color:#ffd23f; font-size:18px; }
-
-  /* ---- in-game HUD ---- */
+  #goRescued{ margin:0; color:#ffd23f; font-size:clamp(16px,5vw,22px); }
+  #goBest{ margin:0; color:#9fe6ff; font-size:16px; }
   #hud{ position:absolute; left:0; right:0; top:0; display:flex; justify-content:space-between;
     align-items:flex-start; padding:max(10px,env(safe-area-inset-top)) 14px 0; pointer-events:none; }
+  #hudLeft{ display:flex; flex-direction:column; gap:3px; }
   #hearts{ display:flex; gap:4px; }
-  .heart{ width:20px; height:20px; image-rendering:pixelated; }
+  .heart{ width:22px; height:20px; image-rendering:pixelated; }
+  #rescued{ font-size:14px; font-weight:900; color:#fff; text-shadow:0 2px 0 #000; letter-spacing:1px; }
+  #rescued b{ color:#ffe45a; }
   #scoreWrap{ text-align:right; }
   #score{ font-size:26px; font-weight:900; color:#fff; text-shadow:0 2px 0 #000; }
   #best{ font-size:12px; color:#ffd23f; letter-spacing:1px; }
-
-  /* ---- touch controls ---- */
   #pad{ position:absolute; left:0; right:0; bottom:0; display:flex; justify-content:space-between;
     padding:0 14px max(18px,env(safe-area-inset-bottom)); pointer-events:none; }
   .dbtn{ pointer-events:auto; width:clamp(96px,30vw,140px); height:clamp(96px,30vw,140px);
@@ -68,8 +65,6 @@
     font-size:clamp(15px,4.6vw,20px); align-self:flex-end; margin-bottom:8px;
     border-color:rgba(255,210,63,.6); background:rgba(60,42,8,.42); color:#ffd23f; letter-spacing:1px; }
   .dbtn.jump:active{ background:rgba(255,210,63,.35); }
-
-  /* ---- mute ---- */
   #mute{ position:absolute; top:max(8px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
     pointer-events:auto; background:rgba(8,12,30,.6); border:2px solid #2b3566; color:#cdd6ff;
     border-radius:10px; font-size:13px; font-weight:700; padding:6px 12px; cursor:pointer; letter-spacing:1px; }
@@ -79,13 +74,14 @@
 <div id="wrap">
   <canvas id="screen"></canvas>
 
-  <!-- HUD (visible while playing) -->
   <div id="hud" class="hidden">
-    <div id="hearts"></div>
+    <div id="hudLeft">
+      <div id="hearts"></div>
+      <div id="rescued">RESCUED <b>0</b></div>
+    </div>
     <div id="scoreWrap"><div id="score">$0</div><div id="best">BEST $0</div></div>
   </div>
 
-  <!-- touch controls: steer + jump -->
   <div id="pad" class="hidden">
     <button class="dbtn" id="btnLeft" aria-label="left">&#9664;</button>
     <button class="dbtn jump" id="btnJump" aria-label="jump">JUMP</button>
@@ -94,24 +90,23 @@
 
   <button id="mute" class="hidden">&#128266; SOUND</button>
 
-  <!-- TITLE -->
   <div id="scrTitle" class="layer">
-    <h1 class="title pixfont">BOAT</h1>
-    <p class="tagline pixfont">an endless river run</p>
+    <h1 class="title pixfont">CHICKEN<br>RESCUE</h1>
+    <p class="tagline pixfont">save the chickens on the river!</p>
     <div class="card">
-      Steer down the river. <b>Dodge</b> rocks, logs &amp; buoys.
-      <b>Grab</b> eggs, hotdogs &amp; friends for points.
+      <span class="chick"><b>Rescue the chickens</b> floating down the river</span> &mdash; steer into them for big points!
+      <b>Dodge</b> rocks, logs &amp; buoys (they cost a life). Grab eggs &amp; hotdogs for bonus.
       <br><br>
-      <b>&#9664; / &#9654;</b> steer &middot; <b>JUMP</b> (or &#9650; / Space) to hop ramps &amp; clear obstacles. 3 lives.
+      <b>&#9664; / &#9654;</b> steer &middot; <b>JUMP</b> (&#9650; / Space) to hop ramps &amp; clear obstacles. 3 lives.
     </div>
     <button class="btn" id="btnStart">START</button>
     <p class="small pixfont">a Sass Attack joint</p>
   </div>
 
-  <!-- GAME OVER -->
   <div id="scrOver" class="layer hidden">
     <h1 class="title pixfont" style="font-size:clamp(34px,12vw,64px)">GAME&nbsp;OVER</h1>
     <p id="goScore" class="pixfont">$0</p>
+    <p id="goRescued" class="pixfont">0 chickens rescued</p>
     <p id="goBest" class="pixfont">BEST $0</p>
     <button class="btn alt" id="btnAgain">RUN AGAIN</button>
     <p class="small pixfont">local high score only &mdash; for now</p>
@@ -123,7 +118,6 @@
   'use strict';
   const $ = id => document.getElementById(id);
 
-  /* ===== immersive / fullscreen (best effort, never throws) ===== */
   function goImmersive(){
     try{ const el=document.documentElement;
       const rfs=el.requestFullscreen||el.webkitRequestFullscreen||el.msRequestFullscreen;
@@ -132,319 +126,298 @@
     try{ if(screen.orientation&&screen.orientation.lock){ const po=screen.orientation.lock('portrait'); if(po&&po.catch) po.catch(()=>{}); } }catch(e){}
   }
 
-  /* =====================================================================
-     AUDIO — everything synthesized via Web Audio (no audio files).
-     SFX: pickup chime / hit / life-lost / game-over / start / jump / land / turn / ramp.
-     Music: a light, loopable chiptune bed (paddling groove) while playing.
-     Master mute toggle persisted in localStorage ('boat_muted').
-     ===================================================================== */
+  /* ===== AUDIO (all synthesized; mute persisted in localStorage 'boat_muted') ===== */
   const AudioFX = (() => {
     let ctx=null, master=null, muted=false;
     try{ muted = localStorage.getItem('boat_muted')==='1'; }catch(e){}
-
     function ensure(){
       if(ctx) return ctx;
-      try{
-        const AC = window.AudioContext || window.webkitAudioContext;
-        if(!AC) return null;
-        ctx = new AC();
-        master = ctx.createGain();
-        master.gain.value = muted ? 0 : 0.9;
-        master.connect(ctx.destination);
-      }catch(e){ ctx=null; }
-      return ctx;
+      try{ const AC=window.AudioContext||window.webkitAudioContext; if(!AC) return null;
+        ctx=new AC(); master=ctx.createGain(); master.gain.value=muted?0:0.9; master.connect(ctx.destination);
+      }catch(e){ ctx=null; } return ctx;
     }
     function resume(){ try{ if(ctx && ctx.state!=='running') ctx.resume(); }catch(e){} }
-
     function tone(freq,dur,type,peak,slideTo,delay){
       if(!ensure()||muted) return;
-      const t = ctx.currentTime + (delay||0);
-      const o=ctx.createOscillator(), g=ctx.createGain();
-      o.type=type||'square';
-      o.frequency.setValueAtTime(freq,t);
+      const t=ctx.currentTime+(delay||0); const o=ctx.createOscillator(), g=ctx.createGain();
+      o.type=type||'square'; o.frequency.setValueAtTime(freq,t);
       if(slideTo) o.frequency.exponentialRampToValueAtTime(Math.max(1,slideTo), t+dur);
-      g.gain.setValueAtTime(0.0001,t);
-      g.gain.exponentialRampToValueAtTime(peak||0.16, t+0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, t+dur);
-      o.connect(g); g.connect(master);
-      o.start(t); o.stop(t+dur+0.03);
+      g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(peak||0.16,t+0.01);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+      o.connect(g); g.connect(master); o.start(t); o.stop(t+dur+0.03);
     }
     function arp(freqs,step,dur,type,peak){ freqs.forEach((f,i)=>tone(f,dur,type,peak,null,i*step)); }
-    function noise(dur,peak,delay){
+    function noise(dur,peak,delay,cut){
       if(!ensure()||muted) return;
-      const t=ctx.currentTime+(delay||0);
-      const n=Math.floor(ctx.sampleRate*dur);
+      const t=ctx.currentTime+(delay||0); const n=Math.floor(ctx.sampleRate*dur);
       const buf=ctx.createBuffer(1,n,ctx.sampleRate), d=buf.getChannelData(0);
       for(let i=0;i<n;i++) d[i]=(Math.random()*2-1)*(1-i/n);
       const src=ctx.createBufferSource(); src.buffer=buf;
       const g=ctx.createGain(); g.gain.value=peak||0.2;
-      const f=ctx.createBiquadFilter(); f.type='lowpass'; f.frequency.value=1400;
+      const f=ctx.createBiquadFilter(); f.type='bandpass'; f.frequency.value=cut||1400; f.Q.value=cut?6:1;
       src.connect(f); f.connect(g); g.connect(master); src.start(t);
     }
+    const pickup   = () => arp([784,988,1319],0.06,0.14,'square',0.15);
+    const bonus    = () => arp([659,880,1175,1568],0.05,0.14,'triangle',0.16);
+    const hit      = () => { noise(0.22,0.30,0,900); tone(150,0.26,'sawtooth',0.22,60); };
+    const lifeLost = () => arp([392,294,196],0.10,0.22,'square',0.18);
+    const start    = () => arp([523,659,784,1046],0.07,0.18,'square',0.16);
+    const over     = () => { arp([330,262,196,131],0.14,0.34,'triangle',0.2); tone(98,0.7,'sawtooth',0.12,70,0.2); };
+    const jump     = () => { tone(300,0.16,'square',0.16,780); tone(540,0.12,'sine',0.07,1060,0.02); };
+    const land     = () => { noise(0.16,0.22,0,700); tone(240,0.12,'sine',0.10,110); };
+    const turn     = () => tone(540,0.09,'triangle',0.05,660);
+    const ramp     = () => arp([420,640,940],0.05,0.12,'square',0.15);
+    // chicken cluck: a short pitched chirp gliding down + a band-noise transient = "bok"
+    function bok(delay,base){ const b=base||880;
+      tone(b,0.06,'square',0.11,b*0.55,delay);
+      tone(b*1.45,0.045,'triangle',0.05,b*0.85,delay+0.004);
+      noise(0.05,0.12,delay,1700); }
+    const cluck  = () => { bok(0,820); bok(0.13,760); };                       // ambient bok-bok
+    const rescue = () => { bok(0,900); bok(0.11,860);                          // bok-bok-BAWK! (rising, happy)
+                           tone(640,0.13,'square',0.12,1240,0.24); tone(940,0.10,'triangle',0.06,1560,0.26); };
 
-    // --- SFX ---
-    const pickup   = () => arp([784, 988, 1319], 0.06, 0.14, 'square', 0.15);            // bright chime up
-    const bonus    = () => arp([659,880,1175,1568], 0.05, 0.14, 'triangle', 0.16);
-    const hit      = () => { noise(0.22,0.30); tone(150,0.26,'sawtooth',0.22,60); };      // crunch
-    const lifeLost = () => arp([392,294,196], 0.10, 0.22, 'square', 0.18);               // descending
-    const start    = () => arp([523,659,784,1046], 0.07, 0.18, 'square', 0.16);
-    const over     = () => { arp([330,262,196,131], 0.14, 0.34, 'triangle', 0.2);
-                             tone(98,0.7,'sawtooth',0.12,70,0.2); };
-    // new-mechanic SFX
-    const jump     = () => { tone(300,0.16,'square',0.16,780); tone(540,0.12,'sine',0.07,1060,0.02); }; // rising boing/whoosh
-    const land     = () => { noise(0.16,0.22); tone(240,0.12,'sine',0.10,110); };                       // splash
-    const turn     = () => tone(540,0.09,'triangle',0.05,660);                                          // subtle bend cue
-    const ramp     = () => arp([420,640,940], 0.05, 0.12, 'square', 0.15);                              // ramp boost
-
-    // --- background MUSIC: light chiptune paddling groove (loops) ---
     let musicGain=null, loopTimer=null, bedOn=false, nextAt=0;
     const BPM=120, BEAT=60/BPM, BAR=BEAT*4, LOOP=BAR*4;
-    const N={ C3:130.81,E3:164.81,G3:196,A3:220,B3:246.94,
-              C4:261.63,D4:293.66,E4:329.63,G4:392,A4:440,B4:493.88,C5:523.25,D5:587.33,E5:659.25 };
+    const N={ C3:130.81,E3:164.81,G3:196,A3:220,B3:246.94,C4:261.63,D4:293.66,E4:329.63,G4:392,A4:440,B4:493.88,C5:523.25,D5:587.33,E5:659.25 };
     const BASS=['C3','C3','A3','A3','G3','G3','E3','E3','C3','C3','A3','A3','G3','G3','G3','B3'];
     const LEAD=['C5','E5','G4','E5','A4','C5','E5','C5','G4','E5','D5','E5','G4','D5','B4','D5'];
-    function mnote(t0,freq,dur,type,peak){
-      if(muted||!ctx||!musicGain) return;
-      const o=ctx.createOscillator(), g=ctx.createGain();
-      o.type=type; o.frequency.setValueAtTime(freq,t0);
-      g.gain.setValueAtTime(0.0001,t0);
-      g.gain.exponentialRampToValueAtTime(peak,t0+0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
-      o.connect(g); g.connect(musicGain); o.start(t0); o.stop(t0+dur+0.05);
-    }
-    function playLoop(t0){
-      const step=BEAT/2;                 // eighth notes
-      for(let i=0;i<16;i++){
-        const t=t0+i*step;
-        mnote(t, N[BASS[i]], step*1.6, 'triangle', 0.10);          // bouncy bass
-        if(i%2===0) mnote(t, N[LEAD[i]], step*0.9, 'square', 0.07); // light lead
-        if(i%4===0) noise && null;
-      }
-      return LOOP;
-    }
-    function schedule(){
-      if(!bedOn||!ctx) return;
-      while(nextAt < ctx.currentTime + 0.3){ nextAt += playLoop(nextAt); }
-      loopTimer=setTimeout(schedule,120);
-    }
-    function startBed(){
-      stopBed(); bedOn=true;
-      if(!ensure()) return; resume();
+    function mnote(t0,freq,dur,type,peak){ if(muted||!ctx||!musicGain) return;
+      const o=ctx.createOscillator(), g=ctx.createGain(); o.type=type; o.frequency.setValueAtTime(freq,t0);
+      g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(peak,t0+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001,t0+dur); o.connect(g); g.connect(musicGain); o.start(t0); o.stop(t0+dur+0.05); }
+    function playLoop(t0){ const step=BEAT/2;
+      for(let i=0;i<16;i++){ const t=t0+i*step; mnote(t,N[BASS[i]],step*1.6,'triangle',0.10); if(i%2===0) mnote(t,N[LEAD[i]],step*0.9,'square',0.07); }
+      return LOOP; }
+    function schedule(){ if(!bedOn||!ctx) return; while(nextAt<ctx.currentTime+0.3){ nextAt+=playLoop(nextAt); } loopTimer=setTimeout(schedule,120); }
+    function startBed(){ stopBed(); bedOn=true; if(!ensure()) return; resume();
       try{ musicGain=ctx.createGain(); musicGain.gain.value=0.6; musicGain.connect(master); }catch(e){ musicGain=null; }
-      nextAt=ctx.currentTime+0.08; schedule();
-    }
-    function stopBed(){
-      bedOn=false;
-      if(loopTimer){ clearTimeout(loopTimer); loopTimer=null; }
-      if(musicGain&&ctx){ const mg=musicGain; musicGain=null;
-        try{ mg.gain.setTargetAtTime(0.0001,ctx.currentTime,0.05); }catch(e){}
-        setTimeout(()=>{ try{ mg.disconnect(); }catch(e){} },500);
-      } else musicGain=null;
-    }
-    function setMuted(m){
-      muted=m;
-      try{ localStorage.setItem('boat_muted', m?'1':'0'); }catch(e){}
-      if(master) master.gain.value = m?0:0.9;
-    }
+      nextAt=ctx.currentTime+0.08; schedule(); }
+    function stopBed(){ bedOn=false; if(loopTimer){ clearTimeout(loopTimer); loopTimer=null; }
+      if(musicGain&&ctx){ const mg=musicGain; musicGain=null; try{ mg.gain.setTargetAtTime(0.0001,ctx.currentTime,0.05); }catch(e){}
+        setTimeout(()=>{ try{ mg.disconnect(); }catch(e){} },500); } else musicGain=null; }
+    function setMuted(m){ muted=m; try{ localStorage.setItem('boat_muted', m?'1':'0'); }catch(e){} if(master) master.gain.value=m?0:0.9; }
     return { ensure, resume, isMuted:()=>muted, setMuted,
-             pickup, bonus, hit, lifeLost, start, over, jump, land, turn, ramp, startBed, stopBed };
+             pickup, bonus, hit, lifeLost, start, over, jump, land, turn, ramp, cluck, rescue, startBed, stopBed };
   })();
 
-  /* =====================================================================
-     PIXEL ART — sprites are arrays of equal-length strings; each character
-     maps to a palette colour ('.' = transparent). They are drawn block-by
-     -block to the LOW-RES buffer, so every pixel stays chunky after the
-     buffer is integer-scaled up to the screen.
-     ===================================================================== */
-  const PAL = {
-    // boat / water / world
-    k:'#140d18', // outline
-    r:'#c0392b', R:'#7a1d10', w:'#caa15a', W:'#8a6a35', m:'#586074', M:'#3a4256',
-    f:'#eaf6ff',
-    j:'#ff3b1e', J:'#ff8a1e',  // engine flame: red-orange / orange (yellow core reuses 'y')
-    // driver (pink hair)
-    p:'#ff6fae', P:'#d84f8e', s:'#f1c79a', b:'#37c6ff',
-    // sidekick (captain hat)
-    h:'#ffffff', x:'#1a1a2a', g:'#ffd23f', n:'#284a8a',
-    // obstacles
-    a:'#8a8f9c', A:'#5b606e', o:'#9c6b3b', O:'#6b4724', e:'#e8e8ee',
-    // pickups
-    y:'#ffe05a', Y:'#f4b73d', q:'#ff4d6d', Q:'#c0264a',
-    d:'#cfd6ff', D:'#9aa4d8', t:'#39d98a', T:'#2a9c63',
-    c:'#b7791f', u:'#7a4e10',
-    z:'#ff5cc8', Z:'#8a2be2', G:'#37ffb0',
-    l:'#7ad7ff'
-  };
-
-  // Combined boat (rear view) with two riders. 32 wide.
+  /* ===== 16-bit PALETTE + SPRITES (chunky pixel-art, integer-scaled buffer) ===== */
+  const PAL = { 'k':'#120a16', 'K':'#2c1e2b', '1':'#ef6b4a', '2':'#d4452c', '3':'#a32a1d', '4':'#6f1a12', '5':'#f0cf8e', '6':'#cda35d', '7':'#9c7838', '8':'#6d5226', '9':'#9aa3ba', 'm':'#5d6680', 'M':'#3a4256', 'f':'#eef9ff', 'F':'#bfe6ff', 'h':'#ffffff', 'H':'#cdd6ec', 'x':'#1d1d2e', 'g':'#ffd23f', 'G':'#d6a521', 'n':'#3f60b8', 'N':'#284a8a', 's':'#ffd9a8', 'S':'#e7b483', 't':'#c98f63', 'p':'#ff9ecf', 'P':'#ff6fae', 'o':'#d44f8e', 'O':'#a3396e', 'c':'#7fe0ff', 'C':'#37c6ff', 'u':'#1f9fd6', 'e':'#ffffff', 'w':'#fff8f0', 'W':'#e7ddcc', 'v':'#ff5566', 'V':'#d6263a', 'z':'#ffb02e', 'Z':'#e0860f', 'j':'#ff3b1e', 'J':'#ff8a1e', 'y':'#ffe45a', 'Y':'#fff6c0', 'a':'#c2c8d4', 'A':'#8a8f9c', 'b':'#565b69', 'B':'#383c47', 'r':'#9c6b3b', 'R':'#6b4724', 'U':'#46301c', 'l':'#bd8b54', 'L':'#d9b07e', 'q':'#57c074', 'Q':'#2f9a4a', 'i':'#d6f3ff' };
   const SPR_BOAT = [
-    "................................",
-    "................................",
-    "........hhh........pppp.........",
-    ".......khhhhk.....pppppp........",
-    ".......kxgxk......pesesp........",
-    "........kssk......pksksp........",
-    "........kssk......pssssp........",
-    ".......knnnnk....kkbbbbkk.......",
-    "......knnnnnnk...kbbbbbbk.......",
-    "......knnnnnnk...kbbbbbbk.......",
-    "....kkkkkkkkkkkkkkkkkkkkkkk.....",
-    "...kwwwwwwwwwwwwwwwwwwwwwwwwk...",
-    "..kwWWwwwwwwwwwwwwwwwwwwwWWwwk..",
-    "..kwwwwwwwwwwwwwwwwwwwwwwwwwwk..",
-    "..krrrrrrrrrrrrrrrrrrrrrrrrrrk..",
-    "..kRrrrrrrrrrrrrrrrrrrrrrrrrRk..",
-    "...kRRrrrrrrrrrrrrrrrrrrrrRRk...",
-    "....kRRRrrrrrrrrrrrrrrrrRRRk....",
-    ".....kkRRRRRRRRRRRRRRRRRRkk.....",
-    "......fk.kkmmkk..kkmmkk.kf......",
-    "......ffff.kMMk..kMMk.ffff......",
-    ".....ffffff.kk....kk.ffffff....."
+    "............................................",
+    "............................................",
+    "..........hhhh.................pppp.........",
+    ".........hHHHHh...............pPPPPp........",
+    "........hHHHHHHh.............pPPPPPPp.......",
+    ".......kHHHHHHHHk...........pPPPPPPPPp......",
+    ".........kxxxxk..............pPsssssPp......",
+    ".........xggGxx..............pPeeseePp......",
+    "..........sSSt...............pPkeskePp......",
+    "..........sSSt...............pPsStSsPp......",
+    ".........nNNNNn..............pPsskssPp......",
+    "........nNNNNNNn..............cCCCCCc.......",
+    ".......kNNNNNNNNk............cCCCCCCCc......",
+    ".......kNnNNNNnNk...........kCCCCCCCCCk.....",
+    ".......kNNNNNNNNk...........kCuCCCCuCk......",
+    "........NNNNNNNN.............CCCCCCCCC......",
+    "..k555555555555555555555555555555555555555k.",
+    "...k6666666666666666666666666666666666666k..",
+    "....k11111111111111111111111111111111111k...",
+    ".....k222222222222222222222222222222222k....",
+    "......k2222222222222222222222222222222k.....",
+    ".......k33333333333333333333333333333k......",
+    "........k333333333333333333333333333k.......",
+    ".........k3333333333333333333333333k........",
+    "..........k33333333333333333333333k.........",
+    "...........k444444444444444444444k..........",
+    "............k4444444444444444444k...........",
+    ".............k44444444444444444k............",
+    "..............k444444444444444k.............",
+    ".............k99999k44444k99999k............",
+    ".............kmmmmmk.....kmmmmmk............",
+    ".............kmmmmmk.....kmmmmmk............",
+    ".............kMMMMMk.....kMMMMMk............",
+    "...........Ff..Ff..Ff..Ff..Ff..Ff..........."
   ];
-
-  // ---- obstacles (small; scaled up by perspective) ----
+  const SPR_CHICKEN = [
+    "................",
+    "......vv........",
+    ".....vVv........",
+    ".....ww.........",
+    "....wwww.zz.....",
+    "....wkww.zZ.....",
+    "....wwwwvz......",
+    "...wwwwww.......",
+    "..wwwwWwww......",
+    "..wwwWWWww......",
+    ".wwwwWWWwww.....",
+    ".wwwwwwwwww.....",
+    ".wwwwwWwwww.....",
+    "..wwwwwwww......",
+    "...zz..zz.......",
+    "................"
+  ];
   const SPR_ROCK = [
-    "..AAAA..",
-    ".AaaaaA.",
-    "AaaaeaaA",
-    "AaeaaaaA",
-    "AaaaaaaA",
-    ".AAaaAA.",
-    "..AAAA..",
-    "........"
+    "..............",
+    "....aaaa......",
+    "...aAAAAa.....",
+    "..aAAAbAAa....",
+    ".aAAbbbAAAa...",
+    ".aAbbbbbbAa...",
+    "aAAbbbbbbBA...",
+    "aAbbbbbbBBA...",
+    ".ABbbbbBBA....",
+    ".ABBBBBBBA....",
+    "..ABBBBBA.....",
+    "...AAAA......."
   ];
   const SPR_LOG = [
     "................",
-    ".kOOOOOOOOOOOOk.",
-    "kOoooooooooooOk.",
-    "kOoOoooOoooOooOk",
-    "kOoooOooooOoooOk",
-    "kOoooooooooooOk.",
-    ".kOOOOOOOOOOOOk.",
+    ".rrRRRRRRRRRRr..",
+    "rLllllllllllLr..",
+    "rRrrrrrrrrrrRr..",
+    "rRrUrrrUrrUrRr..",
+    "rRrrrrrrrrrrRr..",
+    "rLllllllllllLr..",
+    ".rrRRRRRRRRRRr..",
+    "......LL........",
     "................"
   ];
   const SPR_BUOY = [
-    "...kk...",
-    "..keek..",
-    ".kqqqqk.",
-    ".keeeek.",
-    ".kqqqqk.",
-    ".kMMMMk.",
-    "..kMMk..",
-    "..ffff.."
-  ];
-  // launch ramp — telegraphed with cyan up-chevrons
-  const SPR_RAMP = [
     "............",
-    ".....GG.....",
-    "....GGGG....",
-    "...kkOOkk...",
-    "..kOOOOOOk..",
-    ".kOOOOOOOOk.",
-    "kOOOOOOOOOOk",
-    "kkkkkkkkkkkk"
+    "....kk......",
+    "...kiik.....",
+    "..kvvvvk....",
+    "..kvVVvk....",
+    "..kffffk....",
+    "..kvvvvk....",
+    "..kvVVvk....",
+    "..k9mmk.....",
+    "..kmMMk.....",
+    "...kMMk.....",
+    "...ffff.....",
+    "..ffffff....",
+    "............"
   ];
-
-  // ---- pickups (callbacks to the other games) ----
-  const SPR_EGG = [   // Sass Attack
-    "..eee...",
-    ".eeeee..",
-    "eeeYeee.",
-    "eeYYYee.",
-    "eeeYeee.",
-    "eeeeee..",
-    ".eeee...",
-    "........"
+  const SPR_RAMP = [
+    "................",
+    "......cc........",
+    ".....cCCc.......",
+    "....cCCCCc......",
+    "...kk5555kk.....",
+    "..k56666665k....",
+    ".k5666666665k...",
+    "k566666666665k..",
+    "k77777777777Uk..",
+    "kkkkkkkkkkkkkk..",
+    "................"
   ];
-  const SPR_HOTDOG = [ // Sass Attack / NG
-    "........",
-    ".yyyyyy.",
-    "yqqqqqqy",
-    "yqkqqkqy",
-    "yqqqqqqy",
-    ".yyyyyy.",
-    "........",
-    "........"
+  const SPR_EGG = [
+    "............",
+    "....wwww....",
+    "...wwwwww...",
+    "..wwwwwwWw..",
+    "..wwgggwWw..",
+    "..wggGgwWw..",
+    "..wwgggwWw..",
+    "..wwwwwwWw..",
+    "...wwwwWw...",
+    "....wwww....",
+    "............",
+    "............"
   ];
-  const SPR_SANDWICH = [ // WUH / Sandwiches of History
-    ".wwwwww.",
-    "wWWWWWWw",
-    "wtttttw.",
-    ".qqqqq..",
-    "weeeeew.",
-    "wWWWWWWw",
-    ".wwwww..",
-    "........"
+  const SPR_HOTDOG = [
+    "............",
+    ".5555555555.",
+    "5vvVvvVvvvV5",
+    "5vVvvVvvVvv5",
+    ".6666666666.",
+    "............",
+    "............",
+    "............"
   ];
-  const SPR_DISCO = [   // SNL
-    "..dddd..",
-    ".dDdDdD.",
-    "dDdDdDdD",
-    "dDdDdDdD",
-    "dDdDdDdD",
-    ".dDdDdD.",
-    "..dddd..",
-    "...k...."
+  const SPR_SANDWICH = [
+    "............",
+    ".5555555555.",
+    "5LLLLLLLLLL5",
+    ".qqqqqqqqqq.",
+    ".vvvvvvvvvv.",
+    ".6666666666.",
+    "............",
+    "............"
   ];
-  const SPR_COWBELL = [ // SNL (more cowbell)
-    "..cc....",
-    ".cccc...",
-    ".cuuc...",
-    "ccuucc..",
-    "ccuucc..",
-    "cccccc..",
-    ".cuuc...",
-    "........"
+  const SPR_DISCO = [
+    "..........",
+    "...CCCC...",
+    "..CcuCcu..",
+    ".CcuCcuCc.",
+    ".uCcuCcuC.",
+    ".CcuCcuCc.",
+    "..uCcuCc..",
+    "...CCCC...",
+    "....i.....",
+    ".........."
   ];
-  const SPR_PUZZLE = [  // GYUH
-    "..G.G...",
-    ".GGGGG..",
-    "GGGGGGG.",
-    "GGGGGGG.",
-    ".GGGGG..",
-    "GG.G.GG.",
-    "G..G..G.",
-    "........"
+  const SPR_COWBELL = [
+    "..........",
+    "...99.....",
+    "..9mm9....",
+    "..9mm9....",
+    ".9mMMm9...",
+    ".9mMMm9...",
+    "9mMMMMm9..",
+    "9mMMMMm9..",
+    "9mmMMmm9..",
+    ".kZZZZk...",
+    "...ZZ.....",
+    ".........."
   ];
-  const SPR_QBLOCK = [  // WUH? trivia
-    "kkkkkkkk",
-    "kyyyyyyk",
-    "kyykkyyk",
-    "kyykyyyk",
-    "kyyykyyk",
-    "kyyykyyk",
-    "kyyyyyyk",
-    "kkkkkkkk"
+  const SPR_PUZZLE = [
+    "..........",
+    "...qq.....",
+    "..qQQq....",
+    ".qqQQqq...",
+    "qQQQQQQq..",
+    "qQQQQQQq..",
+    ".qQQQQq...",
+    "qq.qq.q...",
+    "q..q..q...",
+    ".........."
   ];
-  // give "?" block a dark "?" — overwrite a couple cells already done above.
-
+  const SPR_QBLOCK = [
+    "kkkkkkkkkk",
+    "kgggggggGk",
+    "kggkkkggGk",
+    "kggkggggGk",
+    "kgggkgggGk",
+    "kgggkgggGk",
+    "kggggggggk",
+    "kgggkgggGk",
+    "kGGGGGGGGk",
+    "kkkkkkkkkk"
+  ];
   const SPR_HEART = [
-    ".qq.qq.",
-    "qqqqqqq",
-    "qqqqqqq",
-    ".qqqqq.",
-    "..qqq..",
-    "...q...",
-    "......."
+    ".vv..vv..",
+    "vVvvvVvv.",
+    "vvvvvvvv.",
+    "vvvvvvvv.",
+    ".vvvvvv..",
+    "..vvvv...",
+    "...vv....",
+    "........."
   ];
 
   const PICKUPS = [
-    { spr:SPR_EGG,      pts:50,  label:'EGG' },
-    { spr:SPR_HOTDOG,   pts:50,  label:'HOTDOG' },
-    { spr:SPR_SANDWICH, pts:75,  label:'SANDWICH' },
-    { spr:SPR_DISCO,    pts:100, label:'DISCO' },
-    { spr:SPR_COWBELL,  pts:75,  label:'COWBELL' },
-    { spr:SPR_PUZZLE,   pts:75,  label:'PUZZLE' },
-    { spr:SPR_QBLOCK,   pts:100, label:'QBLOCK' }
+    { spr:SPR_EGG, pts:50 }, { spr:SPR_HOTDOG, pts:50 }, { spr:SPR_SANDWICH, pts:75 },
+    { spr:SPR_DISCO, pts:100 }, { spr:SPR_COWBELL, pts:75 }, { spr:SPR_PUZZLE, pts:75 }, { spr:SPR_QBLOCK, pts:100 }
   ];
   const OBSTACLES = [ SPR_ROCK, SPR_LOG, SPR_BUOY ];
+  const CHICKEN_PTS = 150;
 
-  /* ===== buffer / scaling ===== */
+  /* ===== buffer / scaling (16-bit: doubled internal resolution, integer-scaled blit) ===== */
   const screen = $('screen');
   const sctx = screen.getContext('2d');
   sctx.imageSmoothingEnabled = false;
-
-  const BASE_W = 160, BASE_H = 288;          // low-res internal resolution (5:9-ish portrait)
+  const BASE_W = 320, BASE_H = 576;          // doubled from 160x288 -> richer 16-bit canvas
   const buf = document.createElement('canvas');
   buf.width = BASE_W; buf.height = BASE_H;
   const bx = buf.getContext('2d');
@@ -453,303 +426,235 @@
   let dpr=1, viewScale=1, offX=0, offY=0;
   function resize(){
     dpr = Math.min(window.devicePixelRatio||1, 3);
-    const cw = window.innerWidth, ch = window.innerHeight;
-    screen.style.width = cw+'px'; screen.style.height = ch+'px';
-    screen.width = Math.floor(cw*dpr); screen.height = Math.floor(ch*dpr);
-    sctx.imageSmoothingEnabled = false;
-    // integer scale of the buffer that fits the device-pixel screen
-    viewScale = Math.max(1, Math.floor(Math.min(screen.width/BASE_W, screen.height/BASE_H)));
-    offX = Math.floor((screen.width  - BASE_W*viewScale)/2);
-    offY = Math.floor((screen.height - BASE_H*viewScale)/2);
+    const cw=window.innerWidth, ch=window.innerHeight;
+    screen.style.width=cw+'px'; screen.style.height=ch+'px';
+    screen.width=Math.floor(cw*dpr); screen.height=Math.floor(ch*dpr);
+    sctx.imageSmoothingEnabled=false;
+    viewScale=Math.max(1, Math.floor(Math.min(screen.width/BASE_W, screen.height/BASE_H)));
+    offX=Math.floor((screen.width - BASE_W*viewScale)/2);
+    offY=Math.floor((screen.height- BASE_H*viewScale)/2);
   }
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', ()=>setTimeout(resize,120));
   resize();
 
-  // draw a sprite into the buffer at integer block-size `sc`, centered on (cx,cy)
   function drawSprite(spr, cx, cy, scx, scy){
-    scx = Math.max(0.5, scx); scy = Math.max(0.5, scy==null ? scx : scy);
-    const h = spr.length, w = spr[0].length;
-    const x0 = cx - (w*scx)/2, y0 = cy - (h*scy)/2;
-    const bw = Math.ceil(scx), bh = Math.ceil(scy);
-    for(let r=0;r<h;r++){
-      const row = spr[r];
-      for(let c=0;c<w;c++){
-        const ch = row[c];
-        if(ch==='.'){ continue; }
-        const col = PAL[ch]; if(!col) continue;
-        bx.fillStyle = col;
-        bx.fillRect(Math.round(x0 + c*scx), Math.round(y0 + r*scy), bw, bh);
-      }
-    }
+    scx=Math.max(0.5,scx); scy=Math.max(0.5, scy==null?scx:scy);
+    const h=spr.length, w=spr[0].length;
+    const x0=cx-(w*scx)/2, y0=cy-(h*scy)/2; const bw=Math.ceil(scx), bh=Math.ceil(scy);
+    for(let r=0;r<h;r++){ const row=spr[r];
+      for(let c=0;c<w;c++){ const ch=row[c]; if(ch==='.') continue; const col=PAL[ch]; if(!col) continue;
+        bx.fillStyle=col; bx.fillRect(Math.round(x0+c*scx), Math.round(y0+r*scy), bw, bh); } }
   }
 
-  /* ===== river perspective ===== */
-  const HZ = 84;                       // horizon line (y in buffer)
-  const CX = BASE_W/2;
-  const TOPW = 12, BOTW = 74;          // river half-width at horizon vs at camera
-  function yAt(t){ return HZ + (BASE_H+24 - HZ) * (t*t); }   // accelerate toward camera
+  /* ===== river perspective (scaled to the bigger buffer) ===== */
+  const HZ = 176, CX = BASE_W/2, TOPW = 26, BOTW = 150;
+  function yAt(t){ return HZ + (BASE_H+50 - HZ) * (t*t); }
   function halfW(t){ return TOPW + (BOTW-TOPW)*t; }
-  function scaleAt(t){ return 0.45 + 2.0*t; }                // sprite grows as it nears
-  // ----- river bend: the channel centerline drifts horizontally. Strong at the horizon
-  // (so a bend is telegraphed well ahead) and gentle near the boat, so curves are fair. -----
-  const BEND_AMP = 38;          // bigger max swing -> genuinely sharp corners
-  function bendPx(t){ return G.curve * BEND_AMP * (1 - 0.82*t); }   // strong at horizon, gentle near the boat (fair)
+  function itemScale(t){ return 0.8 + 2.7*t; }
+  const BEND_AMP = 76;          // doubled with the resolution -> same on-screen sharp corners
+  function bendPx(t){ return G.curve * BEND_AMP * (1 - 0.82*t); }
   function cxAt(t){ return CX + bendPx(t); }
   function xAt(xRel, t){ return cxAt(t) + xRel*halfW(t); }
+  const SB = 3;                 // boat block scale (16-bit chunky)
 
-  /* ===== game state ===== */
-  const G = { state:'title', score:0, dist:0, best:0, lives:3,
-              boatX:0, vx:0, inv:0, items:[], spawnT:0, speed:0, t:0, shake:0,
+  /* ===== state ===== */
+  const G = { state:'title', score:0, dist:0, best:0, lives:3, rescued:0,
+              boatX:0, vx:0, inv:0, items:[], pops:[], spawnT:0, speed:0, t:0, shake:0, cluckT:5,
               curve:0, curveTarget:0, curveTimer:0, curveEase:0.8,
               airborne:false, jumpH:0, jumpVel:0, squashY:1 };
   try{ G.best = parseInt(localStorage.getItem('boat_best')||'0',10)||0; }catch(e){}
-
   const held = { left:false, right:false };
   let waterPhase = 0;
 
-  // ----- steering feel (gentler than v1: lower accel/top speed + stronger damping) -----
-  const STEER_ACC = 0.6;        // was 3.4  — much gentler push
-  const STEER_MAX = 0.30;       // was 1.7  — lower top cross-river speed
-  const STEER_FRICTION = 0.80;  // was 0.86 — more damping = smoother, less twitchy
-  // ----- jump (vertical hop; airborne clears obstacles) -----
-  const JUMP_V0 = 220, GRAVITY = 440;   // BIG hop: apex ~55px, ~1.0s airtime (ramp jumps bigger still)
-  function doJump(){
-    if(G.state!=='play' || G.airborne) return;
-    G.airborne=true; G.jumpVel=JUMP_V0; G.jumpH=0.001; G.squashY=1.36;
-    AudioFX.jump();
-  }
-  function landBoat(){
-    G.airborne=false; G.jumpH=0; G.jumpVel=0; G.squashY=0.70;
-    AudioFX.land();
-  }
+  // steering feel (unchanged tuning) / jump (unchanged big-hop tuning)
+  const STEER_ACC = 0.6, STEER_MAX = 0.30, STEER_FRICTION = 0.80;
+  const JUMP_V0 = 220, GRAVITY = 440;   // apex ~55px(virtual), ~1.0s airtime; ramp jumps bigger
+  function doJump(){ if(G.state!=='play'||G.airborne) return; G.airborne=true; G.jumpVel=JUMP_V0; G.jumpH=0.001; G.squashY=1.36; AudioFX.jump(); }
+  function landBoat(){ G.airborne=false; G.jumpH=0; G.jumpVel=0; G.squashY=0.70; AudioFX.land(); }
 
   function reset(){
-    G.score=0; G.dist=0; G.lives=3; G.boatX=0; G.vx=0; G.inv=0;
-    G.items.length=0; G.spawnT=0.6; G.speed=0.34; G.t=0; G.shake=0;
+    G.score=0; G.dist=0; G.lives=3; G.rescued=0; G.boatX=0; G.vx=0; G.inv=0;
+    G.items.length=0; G.pops.length=0; G.spawnT=0.6; G.speed=0.34; G.t=0; G.shake=0; G.cluckT=4;
     G.curve=0; G.curveTarget=0; G.curveTimer=2.5; G.curveEase=0.8;
     G.airborne=false; G.jumpH=0; G.jumpVel=0; G.squashY=1;
-    held.left=held.right=false;
-    updateHUD();
+    held.left=held.right=false; updateHUD();
   }
 
+  // CHICKENS are the headline rescue collectible: ~30% of spawns. ramp ~8%, bonus pickups ~20%, obstacles ~42%.
   function spawn(){
-    const xRel = (Math.random()*1.5 - 0.75);
-    const roll = Math.random();
-    if(roll < 0.10){                       // ~10% ramps (launch a jump)
-      G.items.push({ kind:'ramp', spr:SPR_RAMP, xRel, t:0, hw:8, gone:false });
-    } else if(roll < 0.50){                // ~40% pickups
-      const p = PICKUPS[(Math.random()*PICKUPS.length)|0];
-      G.items.push({ kind:'pick', spr:p.spr, pts:p.pts, xRel, t:0, hw:8, gone:false });
-    } else {                               // ~50% obstacles
-      const o = OBSTACLES[(Math.random()*OBSTACLES.length)|0];
-      G.items.push({ kind:'obs', spr:o, xRel, t:0, hw: o===SPR_LOG?16:8, gone:false });
-    }
+    const xRel=(Math.random()*1.5-0.75); const roll=Math.random();
+    if(roll < 0.08){ G.items.push({ kind:'ramp', spr:SPR_RAMP, xRel, t:0, hw:9, gone:false }); }
+    else if(roll < 0.38){ G.items.push({ kind:'chicken', spr:SPR_CHICKEN, xRel, t:0, hw:9, big:true, gone:false }); }
+    else if(roll < 0.58){ const p=PICKUPS[(Math.random()*PICKUPS.length)|0]; G.items.push({ kind:'pick', spr:p.spr, pts:p.pts, xRel, t:0, hw:7, gone:false }); }
+    else { const o=OBSTACLES[(Math.random()*OBSTACLES.length)|0]; G.items.push({ kind:'obs', spr:o, xRel, t:0, hw: o===SPR_LOG?16:8, gone:false }); }
   }
 
   function update(dt){
     G.t += dt;
-    // difficulty ramp: speed + spawn rate climb with distance
     G.speed = 0.34 + Math.min(0.85, G.dist/2600);
     const spawnEvery = Math.max(0.42, 0.95 - G.dist/3200);
     waterPhase += dt * (1.2 + G.speed*2);
+    G.dist += G.speed*dt*60; G.score += G.speed*dt*60*0.6;
 
-    // distance scoring
-    G.dist += G.speed * dt * 60;
-    G.score += G.speed * dt * 60 * 0.6;
+    const dir=(held.left?-1:0)+(held.right?1:0);
+    G.vx += dir*STEER_ACC*dt; G.vx *= STEER_FRICTION;
+    if(Math.abs(G.vx)>STEER_MAX) G.vx=Math.sign(G.vx)*STEER_MAX;
+    G.boatX += G.vx; const lim=0.78;
+    if(G.boatX> lim){ G.boatX= lim; G.vx*=-0.2; } if(G.boatX<-lim){ G.boatX=-lim; G.vx*=-0.2; }
 
-    // steering (held = continuous) — gentler accel/top-speed + stronger damping
-    const dir = (held.left?-1:0) + (held.right?1:0);
-    G.vx += dir*STEER_ACC*dt;
-    G.vx *= STEER_FRICTION;
-    if(Math.abs(G.vx)>STEER_MAX) G.vx = Math.sign(G.vx)*STEER_MAX;
-    G.boatX += G.vx;
-    const lim = 0.78;
-    if(G.boatX> lim){ G.boatX= lim; G.vx*=-0.2; }
-    if(G.boatX<-lim){ G.boatX=-lim; G.vx*=-0.2; }
-
-    // river bend: ease the curvature toward a fresh target every few seconds (telegraphed)
     G.curveTimer -= dt;
     if(G.curveTimer<=0){
-      const prev = G.curveTarget;
-      const sharp = Math.random() < 0.35;                                   // ~1 in 3 is a sharp corner
-      const mag = sharp ? (1.05 + Math.random()*0.55) : (Math.random()*0.7); // sharp 1.05-1.6, gentle 0-0.7
-      G.curveTarget = (Math.random()<0.5 ? -1 : 1) * mag;
-      G.curveEase = sharp ? 1.6 : 0.8;                                      // sharp swings in quicker (still telegraphed)
-      G.curveTimer = sharp ? (1.8 + Math.random()*1.6) : (3.0 + Math.random()*3.0);
-      if(sharp || Math.abs(G.curveTarget-prev) > 0.5) AudioFX.turn();
+      const prev=G.curveTarget; const sharp=Math.random()<0.35;
+      const mag=sharp?(1.05+Math.random()*0.55):(Math.random()*0.7);
+      G.curveTarget=(Math.random()<0.5?-1:1)*mag; G.curveEase=sharp?1.6:0.8;
+      G.curveTimer=sharp?(1.8+Math.random()*1.6):(3.0+Math.random()*3.0);
+      if(sharp||Math.abs(G.curveTarget-prev)>0.5) AudioFX.turn();
     }
-    G.curve += (G.curveTarget - G.curve) * Math.min(1, dt*G.curveEase);     // ease-in = readable/telegraphed
+    G.curve += (G.curveTarget-G.curve)*Math.min(1, dt*G.curveEase);
 
-    // jump physics (vertical hop; airborne clears obstacles)
-    if(G.airborne){
-      G.jumpVel -= GRAVITY*dt;
-      G.jumpH  += G.jumpVel*dt;
-      if(G.jumpH<=0) landBoat();
-    }
-    G.squashY += (1 - G.squashY) * Math.min(1, dt*10);            // ease squash/stretch back
+    if(G.airborne){ G.jumpVel-=GRAVITY*dt; G.jumpH+=G.jumpVel*dt; if(G.jumpH<=0) landBoat(); }
+    G.squashY += (1-G.squashY)*Math.min(1, dt*10);
+    if(G.inv>0) G.inv-=dt; if(G.shake>0) G.shake-=dt;
 
-    if(G.inv>0) G.inv -= dt;
-    if(G.shake>0) G.shake -= dt;
+    // ambient cluck now and then
+    G.cluckT -= dt; if(G.cluckT<=0){ AudioFX.cluck(); G.cluckT = 5 + Math.random()*7; }
+    // pops decay
+    for(const p of G.pops) p.age += dt;
+    if(G.pops.length) G.pops = G.pops.filter(p=>p.age<0.55);
 
-    // spawn
     G.spawnT -= dt;
-    if(G.spawnT<=0){ spawn(); G.spawnT = spawnEvery * (0.7+Math.random()*0.6); }
+    if(G.spawnT<=0){ spawn(); G.spawnT = spawnEvery*(0.7+Math.random()*0.6); }
 
-    // advance items toward camera
-    const boatT = 0.9;
     for(const it of G.items){
       if(it.gone) continue;
-      it.t += G.speed * dt;
-      if(it.t > 1.18){ it.gone=true; continue; }
-      // collision band near the boat
+      it.t += G.speed*dt;
+      if(it.t>1.18){ it.gone=true; continue; }
       if(it.t>0.80 && it.t<0.99 && !it.hit){
-        const dxRel = Math.abs(it.xRel - G.boatX);
-        const thresh = it.kind==='obs' ? (it.hw/BOTW + 0.14) : (it.hw/BOTW + 0.10);
-        if(dxRel < thresh){
-          if(it.kind==='pick'){
-            it.hit = true; it.gone=true;
-            G.score += it.pts;
-            (it.pts>=100 ? AudioFX.bonus : AudioFX.pickup)();
+        const dxRel=Math.abs(it.xRel-G.boatX);
+        const thresh = it.kind==='obs' ? (it.hw/BOTW + 0.14) : (it.hw/BOTW + 0.12);
+        if(dxRel<thresh){
+          if(it.kind==='chicken'){
+            it.hit=true; it.gone=true; G.rescued++; G.score += CHICKEN_PTS;
+            AudioFX.rescue();
+            G.pops.push({ x:xAt(it.xRel,it.t), y:yAt(it.t), age:0 });   // happy rescue pop
+          } else if(it.kind==='pick'){
+            it.hit=true; it.gone=true; G.score += it.pts; (it.pts>=100?AudioFX.bonus:AudioFX.pickup)();
           } else if(it.kind==='ramp'){
-            it.hit = true; it.gone=true;
-            G.score += 25;                          // small boost for hitting the ramp
+            it.hit=true; it.gone=true; G.score += 25;
             if(!G.airborne){ G.airborne=true; G.jumpVel=JUMP_V0*1.18; G.jumpH=0.001; G.squashY=1.34; AudioFX.ramp(); }
-          } else if(!G.airborne && G.inv<=0){       // airborne -> obstacle is cleared (no it.hit so it can still land on you)
-            it.hit = true; it.gone=true;
-            G.lives--;
-            G.inv = 1.4;                  // invulnerable + blink window
-            G.shake = 0.35;
-            AudioFX.hit();
-            if(G.lives<=0){ gameOver(); return; }
-            else AudioFX.lifeLost();
+          } else if(!G.airborne && G.inv<=0){
+            it.hit=true; it.gone=true; G.lives--; G.inv=1.4; G.shake=0.35; AudioFX.hit();
+            if(G.lives<=0){ gameOver(); return; } else AudioFX.lifeLost();
           }
         }
       }
     }
-    // prune
     if(G.items.length>60) G.items = G.items.filter(i=>!i.gone);
-
     G.score = Math.max(0, G.score);
     updateHUD();
   }
 
-  /* ===== drawing ===== */
+  /* ===== drawing (richer 16-bit scene: shaded sky/banks/water + foam + sparkle) ===== */
   function drawWater(){
-    // sky / distant bank above horizon
-    let grad = bx.createLinearGradient(0,0,0,HZ);
-    grad.addColorStop(0,'#1a2a55'); grad.addColorStop(1,'#3b5ea8');
-    bx.fillStyle = grad; bx.fillRect(0,0,BASE_W,HZ);
-    // tree line silhouette on the horizon
-    bx.fillStyle = '#173a2a';
-    for(let x=0;x<BASE_W;x+=6){
-      const hh = 4 + ((x*7)%5);
-      bx.fillRect(x, HZ-hh, 6, hh);
-    }
-    // grassy banks fill (whole lower area), river trapezoid carved on top
-    bx.fillStyle = '#1f7a3a'; bx.fillRect(0,HZ,BASE_W,BASE_H-HZ);
-    // bank texture rows
-    bx.fillStyle = '#176030';
-    for(let y=HZ;y<BASE_H;y+=6){ bx.fillRect(0,y,BASE_W,2); }
-
-    // river: filled with animated horizontal water bands (perspective trapezoid)
+    let sky=bx.createLinearGradient(0,0,0,HZ);
+    sky.addColorStop(0,'#0e2a4d'); sky.addColorStop(0.55,'#21527f'); sky.addColorStop(1,'#5b86b0');
+    bx.fillStyle=sky; bx.fillRect(0,0,BASE_W,HZ);
+    bx.fillStyle='rgba(255,255,255,0.10)';
+    for(let i=0;i<4;i++){ const cxp=((i*101 + Math.floor(waterPhase*4)) % (BASE_W+80))-40; bx.fillRect(cxp, 26+i*16, 46, 7); }
+    bx.fillStyle='#16402c';
+    for(let x=0;x<BASE_W;x+=10){ const hh=12+((x*7)%11); bx.fillRect(x, HZ-hh, 10, hh); }
+    bx.fillStyle='#1d5a3a';
+    for(let x=6;x<BASE_W;x+=10){ const hh=7+((x*5)%8); bx.fillRect(x, HZ-hh, 6, hh); }
+    bx.fillStyle='#2f9a4a'; bx.fillRect(0,HZ,BASE_W,BASE_H-HZ);
+    for(let y=HZ;y<BASE_H;y+=8){ bx.fillStyle=(((y/8)|0)&1)?'#2a8b42':'#36ab53'; bx.fillRect(0,y,BASE_W,4); }
     for(let y=HZ;y<BASE_H;y++){
-      const t = Math.sqrt(Math.max(0,(y-HZ)/(BASE_H+24-HZ)));
-      const hw = halfW(t);
-      const cc = cxAt(t);                              // bent channel center
-      const wob = Math.sin((y*0.5)+waterPhase*3.0)*1.4*t;
-      let l = Math.round(cc - hw + wob), r = Math.round(cc + hw + wob);
-      // banded blue with scrolling ripples
-      const band = Math.sin(y*0.6 + waterPhase*4.0 + t*3);
-      bx.fillStyle = band>0 ? '#2f8fd6' : '#2477b8';
-      bx.fillRect(l, y, r-l, 1);
-      // sparkle ripple dashes
-      if(((y + Math.floor(waterPhase*8)) % 7)===0){
-        bx.fillStyle = '#7ad7ff';
-        const sx = l + ((Math.sin(y*1.3+waterPhase*2)*0.5+0.5)*(r-l))|0;
-        bx.fillRect(sx, y, 2, 1);
+      const t=Math.sqrt(Math.max(0,(y-HZ)/(BASE_H+50-HZ)));
+      const hw=halfW(t), cc=cxAt(t);
+      const wob=Math.sin(y*0.25+waterPhase*3.0)*3*t;
+      const l=Math.round(cc-hw+wob), r=Math.round(cc+hw+wob);
+      const band=Math.sin(y*0.3 + waterPhase*4.0 + t*3);
+      bx.fillStyle = band>0.45 ? '#46a6e6' : (band>-0.15 ? '#2f8fd6' : '#2070ac');
+      bx.fillRect(l,y,r-l,1);
+      if(((y + Math.floor(waterPhase*10)) % 9)===0){
+        bx.fillStyle='#9fdcff';
+        const sx=l + ((Math.sin(y*0.7+waterPhase*2)*0.5+0.5)*(r-l))|0; bx.fillRect(sx,y,3,1);
       }
-      // foam edges where water meets bank
-      bx.fillStyle = '#bfe9ff';
-      bx.fillRect(l-1,y,1,1); bx.fillRect(r,y,1,1);
+      bx.fillStyle='#7a5a32'; bx.fillRect(l-3,y,3,1); bx.fillRect(r+1,y,3,1);   // muddy bank edge
+      bx.fillStyle='#dff4ff'; bx.fillRect(l-1,y,1,1); bx.fillRect(r,y,1,1);     // foam line
     }
   }
 
   function drawItems(){
-    // draw far -> near so nearer items overlap
-    const arr = G.items.filter(i=>!i.gone).sort((a,b)=>a.t-b.t);
+    const arr=G.items.filter(i=>!i.gone).sort((a,b)=>a.t-b.t);
     for(const it of arr){
-      const y = yAt(it.t), x = xAt(it.xRel, it.t), sc = scaleAt(it.t);
-      // little shadow on the water
-      bx.fillStyle = 'rgba(8,20,40,0.25)';
-      const sw = it.spr[0].length*Math.round(sc);
-      bx.fillRect(Math.round(x-sw/2), Math.round(y+it.spr.length*Math.round(sc)/2-1), sw, 2);
+      const y=yAt(it.t), x=xAt(it.xRel,it.t), sc=itemScale(it.t)*(it.big?1.15:1);
+      bx.fillStyle='rgba(8,20,40,0.25)';
+      const sw=it.spr[0].length*sc;
+      bx.fillRect(Math.round(x-sw/2), Math.round(y+it.spr.length*sc/2-1), Math.round(sw), 3);
       drawSprite(it.spr, x, y, sc);
     }
   }
 
-  // small animated engine flame (hot motor) — flickers + jitters; bigger while accelerating/airborne
+  function drawPops(){
+    for(const p of G.pops){
+      const k=p.age/0.55, rad=4+k*30;
+      bx.globalAlpha=Math.max(0,1-k);
+      bx.strokeStyle='#fff7d0'; bx.lineWidth=3;
+      bx.beginPath(); bx.arc(p.x, p.y, rad, 0, Math.PI*2); bx.stroke();
+      bx.fillStyle='#fff8f0';
+      for(let i=0;i<6;i++){ const a=i/6*6.283+k*3; bx.fillRect(Math.round(p.x+Math.cos(a)*rad), Math.round(p.y-Math.sin(a)*rad-k*14), 3,3); }
+      bx.fillStyle='#ffd23f';
+      for(let i=0;i<3;i++){ const a=i/3*6.283-k*2; bx.fillRect(Math.round(p.x+Math.cos(a)*rad*0.6), Math.round(p.y-Math.sin(a)*rad*0.6-k*10), 2,2); }
+      bx.globalAlpha=1;
+    }
+  }
+
   function drawFlame(fx, fy, big){
-    const j = (Math.random()*3|0) - 1;              // -1..1 horizontal jitter
-    const ex = (Math.floor(G.t*16)%2) ? 1 : 0;      // 2-frame flicker
-    const tip = (big?2:0) + ex;                     // extra length when accelerating/airborne
-    bx.fillStyle = PAL.j; bx.fillRect(fx-1+j, fy,   3, 2);          // red-orange shoulders
-    bx.fillStyle = PAL.J; bx.fillRect(fx+j,   fy-1, 1, 3);          // orange body
-    bx.fillStyle = PAL.y; bx.fillRect(fx+j,   fy,   1, 2+tip);      // bright yellow core
+    const j=(Math.random()*3|0)-1; const ex=(Math.floor(G.t*16)%2)?1:0; const tip=(big?4:0)+ex*2;
+    bx.fillStyle=PAL.j; bx.fillRect(fx-2+j, fy,   6, 3);
+    bx.fillStyle=PAL.J; bx.fillRect(fx-1+j, fy-1, 3, 4+ex);
+    bx.fillStyle=PAL.y; bx.fillRect(fx+j,   fy,   2, 4+tip);
+    bx.fillStyle=PAL.Y; bx.fillRect(fx+j,   fy+1, 1, 2+tip);   // white-hot core
   }
   function drawBoat(){
-    const t=0.9, groundY=yAt(t)-6, x=xAt(G.boatX,t);
-    const h = G.jumpH;                       // px above the water
-    const y = groundY - h;
-    // shadow on the water (shrinks as the boat rises higher on the bigger jumps)
-    const shW = Math.max(6, 26*(1 - Math.min(0.78, h/80)));
+    const t=0.9, groundY=yAt(t)-12, x=xAt(G.boatX,t);
+    const h=G.jumpH; const y=groundY-h;
+    const shW=Math.max(10, 52*(1-Math.min(0.78, h/80)));
     bx.fillStyle='rgba(8,20,40,0.30)';
-    bx.beginPath(); bx.ellipse(x, groundY+10, shW/2, 3, 0, 0, Math.PI*2); bx.fill();
-    // blink during invulnerability
-    const blink = G.inv>0 && (Math.floor(G.t*16)%2===0);
+    bx.beginPath(); bx.ellipse(x, groundY+18, shW/2, 5, 0, 0, Math.PI*2); bx.fill();
+    const blink=G.inv>0 && (Math.floor(G.t*16)%2===0);
     if(blink) return;
-    // wake foam only while riding the water (not mid-jump)
-    if(h < 4){
+    if(h<6){
       bx.fillStyle='#dff4ff';
-      for(let i=0;i<5;i++){
-        const fy=groundY+12+i*2, fw=10-i;
-        bx.fillRect(Math.round(x-fw), fy, fw*2, 1);
-      }
+      for(let i=0;i<6;i++){ const fy=groundY+22+i*3, fw=20-i*2; bx.fillRect(Math.round(x-fw), fy, fw*2, 2); }
     }
-    // squash & stretch via non-uniform pixel blocks (taller on launch, flatter on land)
-    drawSprite(SPR_BOAT, x, y, 2*(2-G.squashY), 2*G.squashY);
-    // engine exhaust flame at the two stern motors (drawn over the hull edge; bigger while accelerating/airborne)
-    const hot = held.left || held.right || G.airborne;
-    drawFlame(Math.round(x-8), Math.round(y+16), hot);
-    drawFlame(Math.round(x+5), Math.round(y+16), hot);
+    drawSprite(SPR_BOAT, x, y, SB*(2-G.squashY), SB*G.squashY);
+    const hot=held.left||held.right||G.airborne;
+    drawFlame(Math.round(x-18), Math.round(y+38), hot);
+    drawFlame(Math.round(x+18), Math.round(y+38), hot);
   }
 
   function render(){
     bx.clearRect(0,0,BASE_W,BASE_H);
-    drawWater();
-    drawItems();
-    drawBoat();
-
-    // blit buffer -> screen, integer scaled & centered, with optional shake
+    drawWater(); drawItems(); drawBoat(); drawPops();
     let sx=offX, sy=offY;
-    if(G.shake>0){ sx += (Math.random()*2-1)*viewScale; sy += (Math.random()*2-1)*viewScale; }
-    sctx.fillStyle = '#05060f';
-    sctx.fillRect(0,0,screen.width,screen.height);
+    if(G.shake>0){ sx+=(Math.random()*2-1)*viewScale; sy+=(Math.random()*2-1)*viewScale; }
+    sctx.fillStyle='#05060f'; sctx.fillRect(0,0,screen.width,screen.height);
     sctx.drawImage(buf, 0,0,BASE_W,BASE_H, sx,sy, BASE_W*viewScale, BASE_H*viewScale);
   }
 
   /* ===== HUD ===== */
-  function heartSVG(){ return ''; }
   function updateHUD(){
     $('score').textContent = '$' + Math.floor(G.score).toLocaleString();
-    $('best').textContent = 'BEST $' + Math.floor(G.best).toLocaleString();
-    const hc = $('hearts'); hc.innerHTML='';
+    $('best').textContent  = 'BEST $' + Math.floor(G.best).toLocaleString();
+    $('rescued').innerHTML = 'RESCUED <b>' + G.rescued + '</b>';
+    const hc=$('hearts'); hc.innerHTML='';
     for(let i=0;i<G.lives;i++){
-      const cv=document.createElement('canvas'); cv.width=7; cv.height=7; cv.className='heart';
+      const cv=document.createElement('canvas'); cv.width=SPR_HEART[0].length; cv.height=SPR_HEART.length; cv.className='heart';
       const c=cv.getContext('2d');
       for(let r=0;r<SPR_HEART.length;r++) for(let col=0;col<SPR_HEART[r].length;col++){
-        const ch=SPR_HEART[r][col]; if(ch==='.') continue;
-        c.fillStyle = PAL[ch]||'#fff'; c.fillRect(col,r,1,1);
+        const ch=SPR_HEART[r][col]; if(ch==='.') continue; c.fillStyle=PAL[ch]||'#fff'; c.fillRect(col,r,1,1);
       }
       hc.appendChild(cv);
     }
@@ -758,94 +663,65 @@
   /* ===== loop ===== */
   let last=0, raf=0;
   function frame(ts){
-    raf = requestAnimationFrame(frame);
-    if(!last) last=ts;
-    let dt=(ts-last)/1000; last=ts;
-    if(dt>0.05) dt=0.05;                 // clamp big gaps
+    raf=requestAnimationFrame(frame);
+    if(!last) last=ts; let dt=(ts-last)/1000; last=ts; if(dt>0.05) dt=0.05;
     if(G.state==='play') update(dt);
-    if(G.state==='play' || G.state==='title') waterPhase += 0; // keep
     render();
   }
 
-  /* ===== screen flow ===== */
   function show(which){
     $('scrTitle').classList.toggle('hidden', which!=='title');
     $('scrOver').classList.toggle('hidden', which!=='over');
     $('hud').classList.toggle('hidden', which!=='play');
     $('pad').classList.toggle('hidden', which!=='play');
-    $('mute').classList.toggle('hidden', which==='play'?false:false); // mute always visible except none
     $('mute').classList.toggle('hidden', false);
   }
-
-  function startGame(){
-    AudioFX.ensure(); AudioFX.resume(); AudioFX.start();
-    goImmersive();
-    reset();
-    G.state='play';
-    show('play');
-    AudioFX.startBed();
-  }
+  function startGame(){ AudioFX.ensure(); AudioFX.resume(); AudioFX.start(); goImmersive(); reset(); G.state='play'; show('play'); AudioFX.startBed(); }
   function gameOver(){
-    G.state='over';
-    AudioFX.stopBed(); AudioFX.over();
+    G.state='over'; AudioFX.stopBed(); AudioFX.over();
     if(G.score>G.best){ G.best=Math.floor(G.score); try{ localStorage.setItem('boat_best', String(G.best)); }catch(e){} }
-    $('goScore').textContent = '$' + Math.floor(G.score).toLocaleString();
-    $('goBest').textContent = 'BEST $' + Math.floor(G.best).toLocaleString();
+    $('goScore').textContent='$'+Math.floor(G.score).toLocaleString();
+    $('goRescued').textContent = G.rescued + (G.rescued===1?' chicken rescued':' chickens rescued');
+    $('goBest').textContent='BEST $'+Math.floor(G.best).toLocaleString();
     show('over');
   }
 
   /* ===== input ===== */
   function bindHold(btn, side){
-    const on =e=>{ e.preventDefault(); held[side]=true; AudioFX.ensure(); AudioFX.resume(); };
+    const on=e=>{ e.preventDefault(); held[side]=true; AudioFX.ensure(); AudioFX.resume(); };
     const off=e=>{ e.preventDefault(); held[side]=false; };
-    btn.addEventListener('pointerdown',on);
-    btn.addEventListener('pointerup',off);
-    btn.addEventListener('pointerleave',off);
-    btn.addEventListener('pointercancel',off);
-    btn.addEventListener('touchstart',on,{passive:false});
-    btn.addEventListener('touchend',off,{passive:false});
+    btn.addEventListener('pointerdown',on); btn.addEventListener('pointerup',off);
+    btn.addEventListener('pointerleave',off); btn.addEventListener('pointercancel',off);
+    btn.addEventListener('touchstart',on,{passive:false}); btn.addEventListener('touchend',off,{passive:false});
   }
-  bindHold($('btnLeft'),'left');
-  bindHold($('btnRight'),'right');
-  (function bindJump(){
-    const b=$('btnJump');
+  bindHold($('btnLeft'),'left'); bindHold($('btnRight'),'right');
+  (function bindJump(){ const b=$('btnJump');
     const on=e=>{ e.preventDefault(); AudioFX.ensure(); AudioFX.resume(); doJump(); };
-    b.addEventListener('pointerdown',on);
-    b.addEventListener('touchstart',on,{passive:false});
+    b.addEventListener('pointerdown',on); b.addEventListener('touchstart',on,{passive:false});
   })();
 
   window.addEventListener('keydown', e=>{
-    if(e.key===' '||e.key==='ArrowUp'||e.key==='ArrowDown') e.preventDefault(); // no page scroll
+    if(e.key===' '||e.key==='ArrowUp'||e.key==='ArrowDown') e.preventDefault();
     if(e.key==='ArrowLeft'||e.key==='a'){ held.left=true; }
     else if(e.key==='ArrowRight'||e.key==='d'){ held.right=true; }
     else if(e.key==='ArrowUp'||e.key==='w'){ doJump(); }
-    else if(e.key===' '||e.key==='Enter'){
-      if(G.state==='play') doJump();
-      else if(G.state==='title'||G.state==='over') startGame();
-    }
+    else if(e.key===' '||e.key==='Enter'){ if(G.state==='play') doJump(); else if(G.state==='title'||G.state==='over') startGame(); }
   });
   window.addEventListener('keyup', e=>{
-    if(e.key==='ArrowLeft'||e.key==='a') held.left=false;
-    else if(e.key==='ArrowRight'||e.key==='d') held.right=false;
+    if(e.key==='ArrowLeft'||e.key==='a') held.left=false; else if(e.key==='ArrowRight'||e.key==='d') held.right=false;
   });
 
   $('btnStart').addEventListener('click', startGame);
   $('btnAgain').addEventListener('click', startGame);
-
   const muteBtn=$('mute');
   function paintMute(){ muteBtn.innerHTML = AudioFX.isMuted() ? '&#128263; MUTED' : '&#128266; SOUND'; }
   muteBtn.addEventListener('click', ()=>{ AudioFX.setMuted(!AudioFX.isMuted()); paintMute(); AudioFX.ensure(); AudioFX.resume(); });
   paintMute();
+  ['pointerdown','touchstart','keydown'].forEach(ev=> document.addEventListener(ev, ()=>{ AudioFX.ensure(); AudioFX.resume(); }, {passive:true}));
 
-  // robust resume-on-gesture safety net — unlock/resume the AudioContext on ANY gesture
-  ['pointerdown','touchstart','keydown'].forEach(ev=>
-    document.addEventListener(ev, ()=>{ AudioFX.ensure(); AudioFX.resume(); }, {passive:true}));
-
-  // boot
-  show('title');
-  updateHUD();
-  raf = requestAnimationFrame(frame);
+  show('title'); updateHUD(); raf=requestAnimationFrame(frame);
 })();
+
 </script>
 </body>
 </html>

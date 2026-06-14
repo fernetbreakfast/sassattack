@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<title>Sass Attack — Deluxe</title>
+<title>SassPack — NG</title>
 <link rel="icon" type="image/png" href="/gfx/eggman_final.png" />
 <style>
   :root{
@@ -238,13 +238,13 @@
     </div>
     <div class="hud-stats">
       <span id="modeTag">🍳</span>
-      <span>SCORE <b id="score">0</b></span>
+      <span>SCORE <b id="score">$0</b></span>
       <span>♥ <b id="lives">5</b></span>
       <span>W<b id="wave">1</b></span>
       <span class="combo" id="combo">x1</span>
     </div>
     <div class="hud-stats" style="font-size:11px;color:#8b93c0;">
-      HI <span id="highLabel">HIG</span> · <span id="high">0</span>
+      HI <span id="highLabel">HIG</span> · <span id="high">$0</span>
     </div>
   </div>
 
@@ -322,7 +322,7 @@
       <div class="rule-sec">
         <h3>💰 SCORING — THE SASS ECONOMY</h3>
         <p>Every 🌭 costs <span class="tag">−69</span>. The sass tax. Spray and pray and you'll shoot yourself broke.</p>
-        <p>Wave clear bonus: <span class="tag">+100,000</span> · all kill points ride your combo <b>and</b> your difficulty multiplier.</p>
+        <p>Wave clear bonus: <span class="tag">+$100,000</span> · all kill points ride your combo <b>and</b> your difficulty multiplier.</p>
       </div>
 
       <div class="rule-sec">
@@ -385,7 +385,7 @@
     <div class="card">
       <h1>GAME OVER</h1>
       <p class="sub">Final score</p>
-      <div style="font-size:42px;font-weight:900;color:var(--gold);" id="finalScore">0</div>
+      <div style="font-size:42px;font-weight:900;color:var(--gold);" id="finalScore">$0</div>
       <p class="sub muted" id="goNote"></p>
       <div class="lb-block">
         <div class="lb-head">🏆 TOP 10 — ALL TIME</div>
@@ -471,10 +471,11 @@
   const bombBtn=$('bombBtn'), bombBadge=$('bombBadge'), scorchBtn=$('scorchBtn'), scorchFx=$('scorchFx');
 
   const fmt=new Intl.NumberFormat('en-US');
+  const money=n=>'$'+fmt.format(n);   // display-only dollar formatter
   const HS_KEY='sass_attack_hi_v4', HS_NAME_KEY='sass_attack_initials', STATS_KEY='sass_stats_v1';
   let highScore=Number(store.get(HS_KEY)||0);
   let highName=(store.get(HS_NAME_KEY)||'').toUpperCase().slice(0,3);
-  highEl.textContent=fmt.format(highScore); highLabel.textContent=highName||'HIG';
+  highEl.textContent=money(highScore); highLabel.textContent=highName||'HIG';
 
   /* ===== PERSISTENT STATS ===== */
   let stats; try{ stats=JSON.parse(store.get(STATS_KEY))||{}; }catch{ stats={}; }
@@ -624,7 +625,7 @@
 
   /* ===== HELPERS ===== */
   const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-  function addScore(d){ score=Math.max(0,score+d); scoreEl.textContent=fmt.format(Math.round(score)); }
+  function addScore(d){ score=Math.max(0,score+d); scoreEl.textContent=money(Math.round(score)); }
   function award(base){ addScore(Math.round(base*comboMult()*MODE.mul)); }
   function awardFlat(base){ addScore(Math.round(base*MODE.mul)); }
   function drawEmoji(e,x,y,s,alpha,rot){
@@ -769,7 +770,7 @@
       const ini=(row.initials||'---').toUpperCase().slice(0,3);
       const mEmoji=(MODES[row.mode]&&MODES[row.mode].e)||'';
       const a=document.createElement('span'); a.innerHTML=`<span class="rank">${i+1}.</span> <span class="modeBadge">${mEmoji}</span>${ini}`;
-      const b=document.createElement('b'); b.textContent=fmt.format(row.score||0);
+      const b=document.createElement('b'); b.textContent=money(row.score||0);
       li.append(a,b);
       if(highlight&&!marked&&Math.round(row.score)===Math.round(highlight.score)&&ini===(highlight.initials||'---').toUpperCase().slice(0,3)){
         li.classList.add('me'); marked=true;
@@ -783,7 +784,7 @@
   async function syncHigh(){ try{ const r=await fetchT(SCORE_ENDPOINT+'?game=new'); if(!r.ok)return; const d=await r.json();
     if(d&&typeof d.score==='number'){ highScore=Number(d.score)||0; store.set(HS_KEY,String(highScore));
       if(typeof d.initials==='string'&&d.initials.trim()&&d.initials.trim()!=='---'){ highName=d.initials.toUpperCase().slice(0,3); store.set(HS_NAME_KEY,highName); }
-      highEl.textContent=fmt.format(highScore); highLabel.textContent=highName||'HIG'; } }catch{} }
+      highEl.textContent=money(highScore); highLabel.textContent=highName||'HIG'; } }catch{} }
 
   /* ===== MODE SELECT ===== */
   const modeBtns=[...document.querySelectorAll('.mode')];
@@ -956,7 +957,7 @@
     scorchUsed=false; syncSpecials();
     buildCsQueue(); if(cut.active){ cut.active=false; if(window.SassCutscenes)SassCutscenes.stop(); }
     discoFx=null;
-    scoreEl.textContent='0'; livesEl.textContent=String(MODE.lives); waveEl.textContent='1';
+    scoreEl.textContent='$0'; livesEl.textContent=String(MODE.lives); waveEl.textContent='1';
     shots.length=splashes.length=booms.length=bossShots.length=invaders.length=drops.length=pools.length=0;
     bosses=[]; mirrors=[]; mirrorShots.length=0;
     player.spread=player.rapid=player.shield=player.power=0; player.x=W/2;
@@ -1014,13 +1015,13 @@
     setTimeout(playOhNo, 600);   // echoed "OH NO" after the killing-blow fart (and after any jumpscare)
     runId=(Date.now().toString(36)+Math.random().toString(36).slice(2,10));
     stats.games++; stats.bestWave=Math.max(stats.bestWave,wave); saveStats(); renderStats();
-    finalScore.textContent=fmt.format(Math.round(score));
+    finalScore.textContent=money(Math.round(score));
     goScores.innerHTML='<li class="muted">Loading…</li>';
     (async()=>{
       if(!hasInitials()) await new Promise(res=>showHSModal(res));
       if(score>highAtRun){
         highScore=score; store.set(HS_KEY,String(highScore));
-        highEl.textContent=fmt.format(highScore); highLabel.textContent=highName||'HIG';
+        highEl.textContent=money(highScore); highLabel.textContent=highName||'HIG';
         await postHighScore(highScore);
       }
       const onBoard = await maybePostLeaderboard(score);

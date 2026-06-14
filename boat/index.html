@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<title>BOAT</title>
+<title>SassPack — BOAT</title>
 <link rel="icon" type="image/png" href="/gfx/eggman_final.png" />
 <style>
   :root{ color-scheme: dark; --ink:#0a0c1a; }
@@ -78,7 +78,7 @@
   <!-- HUD (visible while playing) -->
   <div id="hud" class="hidden">
     <div id="hearts"></div>
-    <div id="scoreWrap"><div id="score">0</div><div id="best">BEST 0</div></div>
+    <div id="scoreWrap"><div id="score">$0</div><div id="best">BEST $0</div></div>
   </div>
 
   <!-- touch d-pad -->
@@ -106,8 +106,8 @@
   <!-- GAME OVER -->
   <div id="scrOver" class="layer hidden">
     <h1 class="title pixfont" style="font-size:clamp(34px,12vw,64px)">GAME&nbsp;OVER</h1>
-    <p id="goScore" class="pixfont">0</p>
-    <p id="goBest" class="pixfont">BEST 0</p>
+    <p id="goScore" class="pixfont">$0</p>
+    <p id="goBest" class="pixfont">BEST $0</p>
     <button class="btn alt" id="btnAgain">RUN AGAIN</button>
     <p class="small pixfont">local high score only &mdash; for now</p>
   </div>
@@ -646,8 +646,8 @@
   /* ===== HUD ===== */
   function heartSVG(){ return ''; }
   function updateHUD(){
-    $('score').textContent = Math.floor(G.score).toLocaleString();
-    $('best').textContent = 'BEST ' + Math.floor(G.best).toLocaleString();
+    $('score').textContent = '$' + Math.floor(G.score).toLocaleString();
+    $('best').textContent = 'BEST $' + Math.floor(G.best).toLocaleString();
     const hc = $('hearts'); hc.innerHTML='';
     for(let i=0;i<G.lives;i++){
       const cv=document.createElement('canvas'); cv.width=7; cv.height=7; cv.className='heart';
@@ -694,8 +694,8 @@
     G.state='over';
     AudioFX.stopBed(); AudioFX.over();
     if(G.score>G.best){ G.best=Math.floor(G.score); try{ localStorage.setItem('boat_best', String(G.best)); }catch(e){} }
-    $('goScore').textContent = Math.floor(G.score).toLocaleString();
-    $('goBest').textContent = 'BEST ' + Math.floor(G.best).toLocaleString();
+    $('goScore').textContent = '$' + Math.floor(G.score).toLocaleString();
+    $('goBest').textContent = 'BEST $' + Math.floor(G.best).toLocaleString();
     show('over');
   }
 

@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="robots" content="noindex, noimageindex" />
-<title>WUH? — Sass Attack</title>
+<title>SassPack — WUH?</title>
 <link rel="icon" type="image/png" href="/gfx/eggman_final.png" />
 <style>
   :root{
@@ -202,8 +202,8 @@
   <!-- QUESTION -->
   <section class="screen" id="scrQuestion">
     <div class="hud" id="hud">
-      <div class="pcard p1" id="card0"><div class="pname" id="pn0">P1</div><div class="pscore" id="ps0">0</div></div>
-      <div class="pcard p2" id="card1"><div class="pname" id="pn1">P2</div><div class="pscore" id="ps1">0</div></div>
+      <div class="pcard p1" id="card0"><div class="pname" id="pn0">P1</div><div class="pscore" id="ps0">$0</div></div>
+      <div class="pcard p2" id="card1"><div class="pname" id="pn1">P2</div><div class="pscore" id="ps1">$0</div></div>
     </div>
     <div class="roundtag" id="roundTag">ROUND 1 of 5</div>
     <div class="timer" id="timer"><div class="timer-track"><div class="timer-bar" id="timerBar"></div></div><div class="timer-num" id="timerNum">15</div></div>
@@ -231,10 +231,10 @@
     <div class="wrap">
       <p class="sub">WINNER</p>
       <div class="winner-ini" id="winIni">AAA</div>
-      <div class="big" id="winScore">0</div>
+      <div class="big" id="winScore">$0</div>
       <p class="flavor" id="winFlavor"></p>
       <div id="rewardPick" style="width:100%;">
-        <p class="sub">Spoils of war: drop a <b>1,000,000</b> bonus onto one board under your name.</p>
+        <p class="sub">Spoils of war: drop a <b>$1,000,000</b> bonus onto one board under your name.</p>
         <div class="pickgrid">
           <button class="cta reward-btn" data-game="new">NG</button>
           <button class="cta alt reward-btn" data-game="old">OG</button>
@@ -915,8 +915,8 @@ ATL | Many Atlanta streets share which fruit-tree name? | A) Peachtree | B) Magn
 
   function updateHud(){
     $('pn0').textContent = players[0].ini; $('pn1').textContent = players[1].ini;
-    $('ps0').textContent = players[0].score.toLocaleString();
-    $('ps1').textContent = players[1].score.toLocaleString();
+    $('ps0').textContent = '$' + players[0].score.toLocaleString();
+    $('ps1').textContent = '$' + players[1].score.toLocaleString();
   }
 
   /* ===== TURN FLOW ===== */
@@ -984,7 +984,7 @@ ATL | Many Atlanta streets share which fruit-tree name? | A) Peachtree | B) Magn
     btns.forEach((b,i)=>{ b.disabled=true; if(i===curQ.correct) b.classList.add('correct'); if(i===choice && !right) b.classList.add('wrong'); });
 
     if(timedOut){ AudioFX.timeout(); $('qFlavor').textContent = pick(TIMEOUT_FLAVOR); }
-    else if(right){ AudioFX.correct(); $('qFlavor').textContent = pick(RIGHT_FLAVOR) + '  +' + pts.toLocaleString(); }
+    else if(right){ AudioFX.correct(); $('qFlavor').textContent = pick(RIGHT_FLAVOR) + '  +$' + pts.toLocaleString(); }
     else { AudioFX.wrong(); $('qFlavor').textContent = pick(WRONG_FLAVOR); }
 
     const cont=$('btnContinue');
@@ -1008,7 +1008,7 @@ ATL | Many Atlanta streets share which fruit-tree name? | A) Peachtree | B) Magn
 
   function startSuddenDeath(){
     suddenDeath = true; sdRound = 0; sdStarter = Math.random()<0.5?0:1;
-    $('tieMsg').textContent = 'Dead even at ' + players[0].score.toLocaleString() + '. One question each — first to pull ahead takes it all.';
+    $('tieMsg').textContent = 'Dead even at $' + players[0].score.toLocaleString() + '. One question each — first to pull ahead takes it all.';
     let done=false;
     $('btnTie').onclick = ()=>{ if(done) return; done=true; AudioFX.transition(); sdStartRound(); };
     show('scrTie');
@@ -1042,8 +1042,8 @@ ATL | Many Atlanta streets share which fruit-tree name? | A) Peachtree | B) Magn
     const w = players[winIdx];
     $('winIni').textContent = w.ini;
     $('winIni').style.color = winIdx===0 ? 'var(--p1)' : 'var(--p2)';
-    $('winScore').textContent = w.score.toLocaleString() + ' pts';
-    $('winFlavor').textContent = pick(WIN_FLAVOR) + ' (+1,000,000 winner bonus)';
+    $('winScore').textContent = '$' + w.score.toLocaleString() + ' pts';
+    $('winFlavor').textContent = pick(WIN_FLAVOR) + ' (+$1,000,000 winner bonus)';
     $('rewardPick').style.display='block';
     $('rewardMsg').style.display='none';
     $('btnAgain').style.display='none';
@@ -1074,7 +1074,7 @@ ATL | Many Atlanta streets share which fruit-tree name? | A) Peachtree | B) Magn
       }) });
     }catch(e){}
     $('rewardPick').style.display='none';
-    $('rewardMsg').textContent = ini + ' just dropped 1,000,000 onto ' + label + '. Check the board.';
+    $('rewardMsg').textContent = ini + ' just dropped $1,000,000 onto ' + label + '. Check the board.';
     $('btnAgain').style.display='flex';
   }
 
@@ -1107,7 +1107,7 @@ ATL | Many Atlanta streets share which fruit-tree name? | A) Peachtree | B) Magn
           const a = document.createElement('span'); a.className = 'bi';
           a.innerHTML = '<span class="br">' + (i+1) + '.</span> ' + ini;
           const b = document.createElement('span'); b.className = 'bs';
-          b.textContent = Number(row.score || 0).toLocaleString();
+          b.textContent = '$' + Number(row.score || 0).toLocaleString();
           li.append(a, b); list.appendChild(li);
         });
       }catch(e){ note("Couldn't load."); }   // per-section failure never hangs the others

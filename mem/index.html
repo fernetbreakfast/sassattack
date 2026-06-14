@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="robots" content="noindex, noimageindex" />
-<title>GYUH — Sass Attack</title>
+<title>SassPack — GYUH</title>
 <link rel="icon" type="image/png" href="/gfx/eggman_final.png" />
 <style>
   :root{
@@ -240,9 +240,9 @@
       <span id="modeTag">&#127859;</span>
       <span class="lives" id="livesEl" aria-label="lives">&#9829;</span>
       <span>RND <b id="roundEl">0</b></span>
-      <span>SCORE <b id="scoreEl">0</b></span>
-      <span>BEST <b id="bestEl">0</b></span>
-      <span>HI <b id="hiEl">0</b></span>
+      <span>SCORE <b id="scoreEl">$0</b></span>
+      <span>BEST <b id="bestEl">$0</b></span>
+      <span>HI <b id="hiEl">$0</b></span>
     </div>
   </div>
 
@@ -328,7 +328,7 @@
     <div class="card">
       <h1 id="goTitle" style="font-size:38px;">GAME OVER</h1>
       <p class="sub" id="goMsg">The demon remembers better than you.</p>
-      <p style="font-size:15px;margin:6px 0;">Score <b id="goScore" style="color:var(--gold);">0</b> pts</p>
+      <p style="font-size:15px;margin:6px 0;">Score <b id="goScore" style="color:var(--gold);">$0</b> pts</p>
       <div class="lb-head">TOP 10</div>
       <ol class="scoreList" id="goScores"><li class="muted">Loading&hellip;</li></ol>
       <div class="row">
@@ -515,8 +515,8 @@
   const scoreEl  = $('scoreEl');
   const livesEl  = $('livesEl');
   // number formatters for the million-point scale
-  const fmtFull  = n => Number(n||0).toLocaleString('en-US');           // 5,000,000
-  const fmtShort = n => { n = Number(n||0); return n >= 1e6 ? (n/1e6).toLocaleString('en-US',{maximumFractionDigits:2}) + 'M' : fmtFull(n); };
+  const fmtFull  = n => '$' + Number(n||0).toLocaleString('en-US');           // 5,000,000
+  const fmtShort = n => { n = Number(n||0); return n >= 1e6 ? '$' + (n/1e6).toLocaleString('en-US',{maximumFractionDigits:2}) + 'M' : fmtFull(n); };
 
   const startOv  = $('start');
   const startBtn = $('startBtn');
@@ -1004,7 +1004,7 @@
       const d = await r.json();
       if(d && typeof d.score === 'number'){
         highScore = Number(d.score) || 0;
-        hiEl.textContent = String(highScore);
+        hiEl.textContent = fmtFull(highScore);
         if(typeof d.initials === 'string' && d.initials.trim() && d.initials.trim() !== '---'){
           if(!highName){ highName = d.initials.toUpperCase().slice(0,3); store.set(NAME_KEY, highName); }
         }

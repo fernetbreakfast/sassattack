@@ -6,7 +6,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-<title>Sass Attack</title>
+<title>SassPack — OG</title>
 
 <link rel="icon" type="image/png" href="gfx/eggman_final.png" />
 
@@ -129,8 +129,8 @@
   <div class="hud" aria-live="polite">
     <div class="hud-title">🐣 Sass Attack 🐣</div>
     <div class="hud-stats">
-      <span>Score: <b id="score">0</b></span>
-      <span><b id="highLabel">HIG</b>: <b id="high">0</b></span>
+      <span>Score: <b id="score">$0</b></span>
+      <span><b id="highLabel">HIG</b>: <b id="high">$0</b></span>
       <span>Lives: <b id="lives">5</b></span>
       <span>Wave: <b id="wave">1</b></span>
     </div>
@@ -231,7 +231,7 @@
   <div class="overlay" id="gameOver">
     <div class="card">
       <h1>💀 Game Over</h1>
-      <p>Score: <b id="finalScore">0</b></p>
+      <p>Score: <b id="finalScore">$0</b></p>
       <div class="btn" id="restart">Play Again</div>
     </div>
   </div>
@@ -285,13 +285,14 @@
 
   /* ===== STATE ===== */
   const fmt=new Intl.NumberFormat('en-US');
+  const money=n=>'$'+fmt.format(n);   // display-only dollar formatter
 
   const HS_KEY='sass_attack_highscore_v3';
   const HS_NAME_KEY='sass_attack_initials';
 
   let highScore=Number(localStorage.getItem(HS_KEY)||0);
   let highName=(localStorage.getItem(HS_NAME_KEY)||'').toUpperCase().slice(0,3);
-  highEl.textContent=fmt.format(highScore);
+  highEl.textContent=money(highScore);
   highLabel.textContent=highName||'HIG';
 
   let running=false, started=false, lastTime=performance.now();
@@ -346,7 +347,7 @@
 
   /* ===== Helpers ===== */
   function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
-  function addScore(delta){ score+=delta; scoreEl.textContent=fmt.format(Math.round(score)); }
+  function addScore(delta){ score+=delta; scoreEl.textContent=money(Math.round(score)); }
   function drawEmoji(e,x,y,s){ ctx.font=`bold ${s}px system-ui, Apple Color Emoji, Segoe UI Emoji, Noto Color Emoji, sans-serif`; ctx.fillText(e,x,y); }
 
   /* ===== Fire (fast: 200ms) ===== */
@@ -412,7 +413,7 @@
       const li=document.createElement('li');
       const a=document.createElement('span'); const b=document.createElement('span');
       a.textContent=`${i+1}. ${(row.initials||'---').toUpperCase().slice(0,3)}`;
-      b.textContent=fmt.format(row.score||0);
+      b.textContent=money(row.score||0);
       li.appendChild(a); li.appendChild(b); scoresList.appendChild(li);
     });
   }
@@ -443,7 +444,7 @@
           highName=d.initials.toUpperCase().slice(0,3);
           localStorage.setItem(HS_NAME_KEY,highName);
         }
-        highEl.textContent=fmt.format(highScore);
+        highEl.textContent=money(highScore);
         highLabel.textContent=highName||'HIG';
       }
     }catch{}
@@ -544,7 +545,7 @@
   function resetGame(){
     highAtRun = highScore;
     score=0; lives=5; wave=1; player.invuln=0;
-    scoreEl.textContent=fmt.format(0); livesEl.textContent='5'; waveEl.textContent='1';
+    scoreEl.textContent=money(0); livesEl.textContent='5'; waveEl.textContent='1';
     shots.length=0; splashes.length=0; booms.length=0; bosses.length=0; bossShots.length=0; invaders.length=0;
     mirrorShots.length=0; mirror=null;
     newWave(1); lastTime=performance.now();
@@ -581,7 +582,7 @@
   function gameOverScreen(){
     sfxDeath();
     running=false;
-    finalScore.textContent = fmt.format(Math.round(score));
+    finalScore.textContent = money(Math.round(score));
     (async ()=>{
       if (score > highAtRun){
         if (!highName || !highName.trim()){
@@ -589,7 +590,7 @@
         }
         highScore = score;
         localStorage.setItem(HS_KEY, String(highScore));
-        highEl.textContent = fmt.format(highScore);
+        highEl.textContent = money(highScore);
         highLabel.textContent = highName || 'HIG';
         await postHighScore(highScore);
       }

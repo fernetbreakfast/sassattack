@@ -59,6 +59,20 @@
   .cta:active{ transform:translateY(2px) scale(.985); }
   .cta.alt{ background:linear-gradient(90deg,var(--hot),var(--gold)); color:#1a0008; box-shadow:0 8px 30px rgba(255,59,107,.4); }
   .foot{ color:#8b93c0; font-size:12px; letter-spacing:.5px; margin-top:2px; }
+
+  /* --- hidden easter-egg cutscene overlay --- */
+  #eggCut{
+    position:fixed; inset:0; z-index:99999; background:#000;
+    display:flex; align-items:center; justify-content:center; overflow:hidden;
+    touch-action:none; cursor:pointer;
+  }
+  #eggCut canvas{ image-rendering:pixelated; image-rendering:crisp-edges; display:block; }
+  #eggSkip{
+    position:fixed; top:14px; right:14px; z-index:100000;
+    font-family:inherit; font-weight:900; letter-spacing:1px; font-size:14px;
+    color:#fff; background:rgba(0,0,0,.45); border:2px solid rgba(255,255,255,.65);
+    border-radius:10px; padding:8px 14px; cursor:pointer; opacity:0; transition:opacity .5s ease;
+  }
 </style>
 </head>
 <body>
@@ -109,6 +123,430 @@
         }
       });
     });
+  })();
+  </script>
+
+  <script>
+  /* ===================================================================
+     HIDDEN EASTER EGG
+     Tap the dead-centre (~middle 40%) of the egg/eggman logo to launch a
+     ~60s 16-bit pixel-art love story between a CHICK and a MONSTER, with
+     an original cheesy Web-Audio synth love ballad. Skip button + tap-to-
+     skip return to the menu; it also auto-returns when the cutscene ends.
+     Self-contained: everything is canvas-drawn + synth-generated.
+  =================================================================== */
+  (() => {
+    'use strict';
+    const logo = document.querySelector('img.logo');
+    if (!logo) return;
+    let active = false;
+
+    // ---- HIDDEN HOTSPOT -------------------------------------------------
+    // Only the centred ~40% box of the logo (normalised 0.30..0.70 on both
+    // axes) is "hot". Taps anywhere else on the logo (or on the menu
+    // buttons, which are separate elements) behave normally, so the secret
+    // stays secret and nothing else is affected.
+    logo.style.cursor = 'default';
+    logo.addEventListener('click', (e) => {
+      const r = logo.getBoundingClientRect();
+      if (!r.width || !r.height) return;
+      const nx = (e.clientX - r.left) / r.width;
+      const ny = (e.clientY - r.top)  / r.height;
+      if (nx >= 0.30 && nx <= 0.70 && ny >= 0.30 && ny <= 0.70) {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!active) startCutscene();
+      }
+    });
+
+    // ===================================================================
+    // CHEESY SYNTH LOVE SONG (Web Audio, all-synth, no files)
+    // I-V-vi-IV ballad (C - G - Am - F) at a slow 76 BPM with a sweet
+    // vibrato lead, a warm triangle pad, a soft sine bass and a twinkly
+    // arpeggio. Five phrases (~63s) are scheduled up front so it glides
+    // across the whole cutscene; stop() fades it out and closes the ctx.
+    // ===================================================================
+    function buildMusic() {
+      const ACtx = window.AudioContext || window.webkitAudioContext;
+      if (!ACtx) return null;
+      let ctx;
+      try { ctx = new ACtx(); } catch (e) { return null; }
+
+      const master = ctx.createGain();
+      master.gain.setValueAtTime(0.0001, ctx.currentTime);
+      master.gain.exponentialRampToValueAtTime(0.42, ctx.currentTime + 1.8);
+      master.connect(ctx.destination);
+
+      const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+      const beat = 60 / 76;                 // seconds per beat
+      const chords = [[60,64,67],[55,59,62],[57,60,64],[53,57,60]]; // C G Am F
+      const bass   = [36, 31, 33, 29];
+      // sappy lead melody, one phrase = 16 beats (4 bars):
+      const mel = [
+        [67,1],[72,1],[71,0.5],[72,0.5],[67,1],
+        [74,1],[71,1],[67,2],
+        [69,1],[72,1],[71,0.5],[69,0.5],[67,1],
+        [65,1],[69,1],[67,2]
+      ];
+
+      function tone(freq, t, dur, type, vol, vib) {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = type; o.frequency.value = freq;
+        if (vib) {
+          const lfo = ctx.createOscillator(), lg = ctx.createGain();
+          lfo.frequency.value = 5.5; lg.gain.value = freq * 0.011;
+          lfo.connect(lg).connect(o.frequency);
+          lfo.start(t); lfo.stop(t + dur + 0.1);
+        }
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(vol, t + 0.05);
+        g.gain.setValueAtTime(vol, t + Math.max(0.07, dur * 0.6));
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(g).connect(master);
+        o.start(t); o.stop(t + dur + 0.08);
+      }
+
+      function schedulePhrase(T) {
+        for (let b = 0; b < 4; b++) {
+          const bt = T + b * 4 * beat;
+          chords[b].forEach(m => tone(mtof(m), bt, 4 * beat * 0.98, 'triangle', 0.055, false));
+          tone(mtof(bass[b]), bt, 4 * beat * 0.98, 'sine', 0.13, false);
+          for (let a = 0; a < 8; a++) {            // twinkly arpeggio
+            const am = chords[b][a % 3] + 12;
+            tone(mtof(am), bt + a * (beat / 2), (beat / 2) * 0.9, 'triangle', 0.025, false);
+          }
+        }
+        let mt = T;
+        mel.forEach(([m, d]) => {
+          if (m > 0) tone(mtof(m + 12), mt, d * beat * 0.95, 'square', 0.045, true);
+          mt += d * beat;
+        });
+      }
+
+      const start = ctx.currentTime + 0.18;
+      const phraseLen = 16 * beat;
+      for (let p = 0; p < 5; p++) schedulePhrase(start + p * phraseLen);
+
+      function stop() {
+        try {
+          master.gain.cancelScheduledValues(ctx.currentTime);
+          master.gain.setValueAtTime(Math.max(0.0001, master.gain.value), ctx.currentTime);
+          master.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+        } catch (e) {}
+        setTimeout(() => { try { ctx.close(); } catch (e) {} }, 450);
+      }
+      return { ctx, stop };
+    }
+
+    // ===================================================================
+    // PIXEL ART
+    // ===================================================================
+    const PAL = {
+      '.':null, 'Y':'#ffd23f', 'y':'#e09a1f', 'o':'#ff8a1a', 'k':'#141426',
+      'w':'#ffffff', 'p':'#ff7aa8', 'R':'#ff3b4d', 'r':'#b81f3a', 'P':'#9b3bff',
+      'm':'#3a0010', 'T':'#ffffff', 'v':'#fff4fb', 'B':'#1b1b2e'
+    };
+    // little yellow chick (faces right by default)
+    const CHICK = [
+      "............",
+      "....YYYY....",
+      "...YYYYYY...",
+      "...YkYYkY...",
+      "...YYYYYYo..",
+      "...pYYYYp...",
+      "...YYYYYY...",
+      "...yYYYYy...",
+      "....yYYy....",
+      "....o..o....",
+      "...oo..oo...",
+      "............"
+    ];
+    // goofy red/purple horned monster (faces left by default)
+    const MON = [
+      "..............",
+      "..P........P..",
+      "..PP......PP..",
+      "...RRRRRRRR...",
+      "..RRRRRRRRRR..",
+      "..RwkRRRRkwR..",
+      "..RRRRRRRRRR..",
+      "..RRmmmmmmRR..",
+      "..RRTmmmmTRR..",
+      "..RRRRRRRRRR..",
+      "..rRRRRRRRRr..",
+      "...rRR..RRr...",
+      "...rr....rr...",
+      ".............."
+    ];
+    const HEART = [
+      ".HH.HH.",
+      "HHHHHHH",
+      "HHHHHHH",
+      ".HHHHH.",
+      "..HHH..",
+      "...H..."
+    ];
+
+    function sprite(g, sp, x, y, sc, flip, tint) {
+      sc = sc || 1;
+      for (let row = 0; row < sp.length; row++) {
+        const line = sp[row];
+        for (let col = 0; col < line.length; col++) {
+          const ch = line[col];
+          const color = tint && ch === 'H' ? tint : PAL[ch];
+          if (!color) continue;
+          const dx = flip ? (line.length - 1 - col) : col;
+          g.fillStyle = color;
+          g.fillRect(Math.round(x + dx * sc), Math.round(y + row * sc), sc, sc);
+        }
+      }
+    }
+    // place a creature by its centre-x and ground (foot) y
+    function creature(g, sp, cx, footY, sc, flip, bob) {
+      const w = sp[0].length * sc, h = sp.length * sc;
+      sprite(g, sp, cx - w / 2, footY - h + (bob || 0), sc, flip);
+    }
+    function heart(g, cx, cy, sc, color, alpha) {
+      const w = HEART[0].length * sc, h = HEART.length * sc;
+      const old = g.globalAlpha; g.globalAlpha = alpha == null ? 1 : alpha;
+      sprite(g, HEART, cx - w / 2, cy - h / 2, sc, false, color);
+      g.globalAlpha = old;
+    }
+
+    // ===================================================================
+    // CUTSCENE
+    // ===================================================================
+    function startCutscene() {
+      active = true;
+      const W = 200, H = 140, DUR = 60000;
+
+      const overlay = document.createElement('div');
+      overlay.id = 'eggCut';
+      const cv = document.createElement('canvas');
+      cv.width = W; cv.height = H;
+      overlay.appendChild(cv);
+      const skip = document.createElement('button');
+      skip.id = 'eggSkip'; skip.textContent = 'SKIP ▸';
+      overlay.appendChild(skip);
+      document.body.appendChild(overlay);
+
+      const g = cv.getContext('2d');
+      g.imageSmoothingEnabled = false;
+      function fit() {
+        const s = Math.max(1, Math.min(window.innerWidth / W, window.innerHeight / H));
+        cv.style.width = (W * s) + 'px';
+        cv.style.height = (H * s) + 'px';
+      }
+      fit(); window.addEventListener('resize', fit);
+
+      const music = buildMusic();
+      if (music) { try { music.ctx.resume(); } catch (e) {} }
+
+      const t0 = performance.now();
+      let raf = 0, ended = false, canSkip = false;
+      setTimeout(() => { canSkip = true; skip.style.opacity = '1'; }, 1800);
+
+      function close() {
+        if (ended) return; ended = true;
+        cancelAnimationFrame(raf);
+        window.removeEventListener('resize', fit);
+        if (music) music.stop();
+        overlay.remove();
+        active = false;
+      }
+      skip.addEventListener('click', (e) => { e.stopPropagation(); close(); });
+      overlay.addEventListener('click', () => { if (canSkip) close(); });
+
+      // ---- drawing helpers ----
+      const clamp = (v,a,b) => v < a ? a : v > b ? b : v;
+      const lp = (a,b,f) => a + (b - a) * f;
+      const lc = (a,b,f) => [Math.round(lp(a[0],b[0],f)), Math.round(lp(a[1],b[1],f)), Math.round(lp(a[2],b[2],f))];
+      const rgb = (c) => 'rgb(' + c[0] + ',' + c[1] + ',' + c[2] + ')';
+
+      function sky(top, bot) {
+        for (let y = 0; y < H; y++) {
+          const c = lc(top, bot, y / H);
+          g.fillStyle = rgb(c); g.fillRect(0, y, W, 1);
+        }
+      }
+      function circle(cx, cy, rad) {
+        g.beginPath(); g.arc(cx, cy, rad, 0, Math.PI * 2); g.fill();
+      }
+      function ground(col, y0) {
+        g.fillStyle = rgb(col); g.fillRect(0, y0, W, H - y0);
+        g.fillStyle = rgb(lc(col, [0,0,0], 0.25)); g.fillRect(0, y0, W, 3);
+      }
+      function caption(str, y) {
+        g.font = 'bold 9px monospace'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
+        g.fillStyle = 'rgba(0,0,0,.75)'; g.fillText(str, W/2 + 1, y + 1);
+        g.fillStyle = '#fff'; g.fillText(str, W/2, y);
+      }
+      function bigtext(str, y, color) {
+        g.font = 'bold 18px monospace'; g.textAlign = 'center';
+        g.fillStyle = 'rgba(0,0,0,.8)'; g.fillText(str, W/2 + 1, y + 1);
+        g.fillStyle = color || '#ffd23f'; g.fillText(str, W/2, y);
+      }
+      // hearts rising from a point, derived purely from time (no state)
+      function risingHearts(ts, baseX, count, spread, color) {
+        for (let i = 0; i < count; i++) {
+          const ph = (ts * 0.45 + i * 0.7) % 2.2;
+          const y = 100 - ph * 46;
+          const x = baseX + Math.sin(ts * 2 + i * 1.7) * spread;
+          const a = clamp(1 - ph / 2.2, 0, 1);
+          const sc = 1 + (i % 2);
+          heart(g, x, y, sc, color || '#ff5b8a', a * 0.9);
+        }
+      }
+      function stars(ts) {
+        g.fillStyle = '#ffffff';
+        for (let i = 0; i < 26; i++) {
+          const x = (i * 53) % W, y = (i * 29) % 90;
+          const tw = 0.5 + 0.5 * Math.sin(ts * 3 + i);
+          g.globalAlpha = tw; g.fillRect(x, y, 1, 1);
+        }
+        g.globalAlpha = 1;
+      }
+      function hills(scroll, col, y0, amp) {
+        g.fillStyle = rgb(col);
+        for (let x = 0; x < W; x++) {
+          const h = y0 + Math.sin((x + scroll) * 0.05) * amp;
+          g.fillRect(x, h, 1, H - h);
+        }
+      }
+      function worm(g2, x, y, ts) {
+        for (let i = 0; i < 6; i++) {
+          g2.fillStyle = i % 2 ? '#ff8fae' : '#ff6f97';
+          g2.fillRect(Math.round(x + i * 2), Math.round(y + Math.sin(ts * 6 + i) * 1.5), 2, 2);
+        }
+      }
+      function confetti(ts) {
+        const cols = ['#ff3b4d','#ffd23f','#37ffb0','#00e0ff','#9b3bff','#ff7aa8'];
+        for (let i = 0; i < 34; i++) {
+          const x = (i * 37 + Math.sin(i) * 10) % W;
+          const y = ((ts * 40 + i * 23) % (H + 20)) - 10;
+          g.fillStyle = cols[i % cols.length];
+          g.fillRect(x, y, 2, 2);
+        }
+      }
+
+      // ---- the scene director ----
+      function draw(ts) {
+        // sky / ground palette shifts across the day -> sunset -> night
+        let top, bot, gcol;
+        if (ts < 35) { top = [108,198,255]; bot = [201,240,255]; gcol = [73,166,76]; }
+        else if (ts < 44) { const f = clamp((ts-35)/9,0,1);
+          top = lc([108,198,255],[58,28,92],f); bot = lc([201,240,255],[255,150,92],f); gcol = lc([73,166,76],[96,116,72],f); }
+        else { const f = clamp((ts-44)/7,0,1);
+          top = lc([58,28,92],[10,9,34],f); bot = lc([255,150,92],[38,28,74],f); gcol = lc([96,116,72],[28,36,58],f); }
+        sky(top, bot);
+        if (ts >= 44) stars(ts);
+
+        // sun: drifts down through the sunset
+        if (ts >= 30 && ts < 50) {
+          const f = clamp((ts-32)/15,0,1), sx = 150, sy = 26 + f * 80;
+          g.fillStyle = 'rgba(255,205,130,0.35)'; circle(sx, sy, 17);
+          g.fillStyle = '#ffe39a'; circle(sx, sy, 11);
+        }
+
+        // montage parallax hills (scene 4)
+        if (ts >= 25 && ts < 35) {
+          const sc = (ts - 25) * 38;
+          hills(sc * 0.4, lc(gcol,[255,255,255],0.18), 86, 6);
+          hills(sc * 0.8, lc(gcol,[0,0,0],0.12), 96, 4);
+        }
+
+        ground(gcol, 104);
+
+        const FOOT = 116;
+
+        // ----- SCENE 1 : THEY MEET (0-8s) -----
+        if (ts < 8) {
+          const a = clamp(ts / 4.5, 0, 1);
+          const cx = lp(-24, 70, a);
+          const mx = lp(224, 130, a);
+          const walk = a < 1;
+          const cb = walk ? -Math.abs(Math.sin(ts * 7)) * 3 : 0;
+          const mb = walk ? -Math.abs(Math.sin(ts * 6 + 1)) * 3 : 0;
+          creature(g, CHICK, cx, FOOT, 3, false, cb);
+          creature(g, MON, mx, FOOT, 3, false, mb);
+          caption(ts < 4 ? 'A SASSY LOVE STORY' : 'two hearts... one yolk', 132);
+        }
+        // ----- SCENE 2 : SHY FIRST GLANCE (8-15s) -----
+        else if (ts < 15) {
+          const look = Math.sin(ts * 1.6) > 0;            // chick glances & looks away
+          creature(g, CHICK, 70, FOOT, 3, !look, 0);
+          creature(g, MON, 130, FOOT, 3, false, -Math.abs(Math.sin(ts*2))*1.5);
+          // shy little hearts + blush sparkle
+          if (Math.sin(ts * 2) > 0.4) heart(g, 100, 70 + Math.sin(ts*3)*3, 1, '#ff8fae', 0.8);
+          g.fillStyle = '#fff'; g.font = '8px monospace'; g.textAlign='center';
+          if (look) g.fillText('♥?', 86, 78);
+          caption('love at first cluck?', 132);
+        }
+        // ----- SCENE 3 : FALLING IN LOVE (15-25s) -----
+        else if (ts < 25) {
+          const a = clamp((ts - 15) / 3, 0, 1);
+          const cx = lp(70, 86, a), mx = lp(130, 114, a);
+          creature(g, CHICK, cx, FOOT, 3, false, 0);
+          creature(g, MON, mx, FOOT, 3, false, 0);
+          const pulse = 4 + Math.sin(ts * 5) * 1.2;
+          heart(g, 100, 54, pulse, '#ff3b6b', 1);
+          risingHearts(ts, 100, 7, 26, '#ff5b8a');
+          caption('IT\'S LOVE !', 132);
+        }
+        // ----- SCENE 4 : MONTAGE WALK (25-35s) -----
+        else if (ts < 35) {
+          const bobC = -Math.abs(Math.sin(ts * 7)) * 3;
+          const bobM = -Math.abs(Math.sin(ts * 7 + 1)) * 3;
+          creature(g, CHICK, 92, FOOT, 3, false, bobC);
+          creature(g, MON, 112, FOOT, 3, false, bobM);
+          if (Math.sin(ts*2) > 0.3) heart(g, 102, 60 + Math.sin(ts*4)*4, 1, '#ff7aa8', 0.8);
+          const msgs = ['walking together...', '...through thick & thin', 'two peas, one pod'];
+          caption(msgs[Math.floor((ts - 25) / 3.4) % msgs.length], 132);
+        }
+        // ----- SCENE 5 : SUNSET (35-44s) -----
+        else if (ts < 44) {
+          // both sit close, facing the sun (right)
+          creature(g, CHICK, 96, FOOT, 3, false, 0);
+          creature(g, MON, 116, FOOT, 3, true, 0);
+          risingHearts(ts, 106, 5, 18, '#ff7aa8');
+          caption('every sunset, side by side', 132);
+        }
+        // ----- SCENE 6 : SHARING A SNACK (44-52s) -----
+        else if (ts < 52) {
+          creature(g, CHICK, 88, FOOT, 3, false, -Math.abs(Math.sin(ts*3))*1);
+          creature(g, MON, 116, FOOT, 3, false, 0);
+          worm(g, 99, 100, ts);
+          if (Math.sin(ts*2.3) > 0) heart(g, 102, 70, 1, '#ff5b8a', 0.85);
+          caption('sharing every last crumb', 132);
+        }
+        // ----- SCENE 7 : HAPPILY EVER AFTER (52-60s) -----
+        else {
+          confetti(ts);
+          // a big heart arch behind the couple
+          heart(g, 100, 46, 9, '#ff3b6b', 0.9);
+          heart(g, 100, 46, 7, '#ff7aa8', 0.6);
+          // bride-chick with veil + groom-monster with bow tie, together
+          creature(g, CHICK, 90, FOOT, 3, false, 0);
+          g.fillStyle = '#fff4fb'; g.fillRect(82, FOOT-38, 16, 4);   // veil
+          creature(g, MON, 116, FOOT, 3, true, 0);
+          g.fillStyle = '#141426'; g.fillRect(112, FOOT-20, 6, 4);   // bow tie
+          if (ts < 57) caption('HAPPILY EVER AFTER', 132);
+          else { bigtext('THE END', 80, '#ffd23f'); caption('♥ the sass goes on ♥', 132); }
+        }
+
+        // subtle vignette so text always reads
+        g.fillStyle = 'rgba(0,0,0,0.18)';
+        g.fillRect(0, 0, W, 6); g.fillRect(0, H-22, W, 22);
+      }
+
+      function frame(now) {
+        const t = now - t0;
+        draw(t / 1000);
+        if (t >= DUR) { close(); return; }
+        raf = requestAnimationFrame(frame);
+      }
+      raf = requestAnimationFrame(frame);
+    }
   })();
   </script>
 </body>

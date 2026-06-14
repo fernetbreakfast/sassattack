@@ -1286,7 +1286,7 @@
   }
   function drawStorm(){
     const s=G.storm, d=s.dark;
-    bx.fillStyle='rgba(10,14,40,'+(0.62*d)+')'; bx.fillRect(0,0,BASE_W,BASE_H);           // darken the scene
+    bx.fillStyle='rgba(10,14,40,'+(0.28*d)+')'; bx.fillRect(0,0,BASE_W,BASE_H);           // darken the scene (lighter dim: was 0.62*d -> 0.28*d so gameplay stays clearly visible)
     bx.globalAlpha=Math.min(1,d*1.15);                                                    // rolling dark clouds up top
     for(let i=0;i<5;i++){ const cw=((i*83 + Math.floor(waterPhase*9)) % (BASE_W+90))-45; drawStormCloud(cw, 16+i*9, 1.3+(i%3)*0.5); }
     bx.globalAlpha=1;
@@ -1392,7 +1392,7 @@
   function gameOver(){ if(G.state!=='play') return; G.lastCapsize=false; endRun(); }
   // LSL TRIVIA TRIGGER CHANCE at each game-over. 1.0 = ALWAYS (for testing). Dial back to 0.05 for the
   // real 1-in-20 rate.  >>> constant name: LSL_CHANCE <<<
-  const LSL_CHANCE = 1.0;
+  const LSL_CHANCE = 1/7;   // ~0.1428 -> roughly 1 in 7 games shows the LSL trivia
   function endRun(){
     G.state='over'; AudioFX.stopBed();
     // LSL TRIVIA GATE -> a correct answer unlocks the Kickin Chicken bonus round
@@ -1585,26 +1585,31 @@
   let boardReturn='scrTitle';
   async function loadBoard(){
     const el=$('boardList'); el.innerHTML='<li><span class="rk">&hellip;</span><span class="sc">loading</span></li>';
-    try{
-      const r=await fetchT(SCORES_ENDPOINT+'?game='+GAME,{},3500); if(!r.ok) throw new Error('HTTP '+r.status);
-      const d=await r.json();
-      // TOLERANT PARSE: accept {top:[...]}, {scores:[...]}, {data:[...]}, {leaderboard:[...]} or a bare array,
-      // and accept score/initials under several common field names (guards against a backend shape mismatch).
-      const list = Array.isArray(d) ? d
-                 : (d && (d.top || d.scores || d.data || d.leaderboard || d.rows)) || [];
-      const top = Array.isArray(list) ? list.slice(0,10) : [];
-      el.innerHTML='';
-      if(!top.length){ el.innerHTML='<li><span class="rk">&mdash;</span><span class="sc">no scores yet</span></li>'; return; }
-      top.forEach((row,i)=>{
-        const li=document.createElement('li');
-        const iniRaw = row.initials!=null?row.initials : (row.ini!=null?row.ini : (row.name!=null?row.name : '---'));
-        const scRaw  = row.score!=null?row.score : (row.points!=null?row.points : (row.pts!=null?row.pts : 0));
-        const ini=String(iniRaw||'---').toUpperCase().slice(0,3);
-        li.innerHTML='<span class="rk">'+(i+1)+'. '+ini+'</span><span class="sc">$'+Number(scRaw||0).toLocaleString()+'</span>';
-        el.appendChild(li);
-      });
-    }catch(e){ try{ console.warn('[boat] leaderboard load failed:', e && e.message); }catch(_){}
-      el.innerHTML='<li><span class="rk">&mdash;</span><span class="sc">couldn\u2019t load</span></li>'; }
+    const msg=(t)=>{ el.innerHTML='<li><span class="rk">&mdash;</span><span class="sc">'+t+'</span></li>'; };
+    // 1) NETWORK / TIMEOUT: fetch rejects (offline, DNS, CORS, abort-timeout) -> surface "couldn't reach"
+    let r;
+    try{ r=await fetchT(SCORES_ENDPOINT+'?game='+GAME,{},3500); }
+    catch(e){ console.error('[boat] scoreboard fetch failed (network/CORS/timeout):', e); msg('\u26a0 couldn\u2019t reach scoreboard'); return; }
+    // 2) HTTP ERROR: server reachable but returned non-2xx -> surface the status code
+    if(!r.ok){ console.error('[boat] scoreboard HTTP error:', r.status, r.statusText); msg('\u26a0 scoreboard error: '+r.status); return; }
+    // 3) PARSE: read raw text first so we can log the actual shape on a parse/format miss
+    let raw='', d=null;
+    try{ raw=await r.text(); d=JSON.parse(raw); }
+    catch(e){ console.error('[boat] scoreboard JSON parse failed:', e, '| raw response (first 300 chars):', String(raw).slice(0,300)); msg('\u26a0 scoreboard bad response'); return; }
+    // TOLERANT PARSE: accept {top:[...]}, {scores:[...]}, {data:[...]}, {leaderboard:[...]}, {rows:[...]} or a bare array
+    const list = Array.isArray(d) ? d : (d && (d.top || d.scores || d.data || d.leaderboard || d.rows)) || [];
+    const top = Array.isArray(list) ? list.slice(0,10) : [];
+    // 4) EMPTY: reached OK and parsed, but no rows -> the board really is empty
+    if(!top.length){ console.warn('[boat] scoreboard returned 0 rows; raw shape (first 300 chars):', String(raw).slice(0,300)); msg('No scores yet \u2014 be the first!'); return; }
+    el.innerHTML='';
+    top.forEach((row,i)=>{
+      const li=document.createElement('li');
+      const iniRaw = row.initials!=null?row.initials : (row.ini!=null?row.ini : (row.name!=null?row.name : '---'));
+      const scRaw  = row.score!=null?row.score : (row.points!=null?row.points : (row.pts!=null?row.pts : 0));
+      const ini=String(iniRaw||'---').toUpperCase().slice(0,3);
+      li.innerHTML='<span class="rk">'+(i+1)+'. '+ini+'</span><span class="sc">$'+Number(scRaw||0).toLocaleString()+'</span>';
+      el.appendChild(li);
+    });
   }
   function openBoard(from){ boardReturn=from; show('scrBoard'); loadBoard(); }
 

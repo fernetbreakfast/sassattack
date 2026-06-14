@@ -345,6 +345,8 @@
     const goalfx   = () => { arp([523,659,784,1046,1318],0.06,0.4,'square',0.16); arp([784,1046,1318,1568,2093],0.06,0.5,'triangle',0.12); // GOAL cheer
                              noise(0.6,0.18,0,2600); [0.1,0.3,0.5].forEach(d=> tone(1568,0.4,'sine',0.08,null,d)); };
     const missfx   = () => { tone(392,0.5,'triangle',0.16,160); tone(294,0.6,'sawtooth',0.12,120,0.12); noise(0.3,0.14,0.0,600); }; // sad womp
+    const thunder  = () => { noise(0.85,0.34,0,240); noise(0.6,0.22,0.18,520);     // rumble + crack
+                             tone(70,0.95,'sawtooth',0.15,40); tone(48,1.15,'sine',0.12,30,0.1); }; // low boom
     const screech  = () => { tone(1500,0.16,'sawtooth',0.10,2300); tone(2100,0.12,'sawtooth',0.07,1500,0.05); }; // raptor screech
     const hawkHit  = () => { noise(0.18,0.22,0,1200); tone(520,0.16,'square',0.13,180); arp([900,640,440],0.05,0.12,'triangle',0.10); };
     // chicken cluck: a short pitched chirp gliding down + a band-noise transient = "bok"
@@ -412,7 +414,7 @@
     return { ensure, resume, isMuted:()=>muted, setMuted,
              pickup, bonus, hit, lifeLost, start, over, jump, land, turn, ramp, cluck, rescue,
              chickpick, kickfx, throwfx, screech, hawkHit, select, jackpot, sink,
-             refwhistle, goalfx, missfx, startBed, stopBed };
+             refwhistle, goalfx, missfx, thunder, startBed, stopBed };
   })();
 
   /* ===== 16-bit PALETTE + SPRITES (chunky pixel-art, integer-scaled buffer) ===== */
@@ -434,19 +436,19 @@
     ".......kNNNNNNNNk...........kCCCCCCCCk......",
     ".......kNnNNNNnNk...........kCuCCCCuCk......",
     "........NNNNNNNN.............CCCCCCCC.......",
-    "..k555555555555555555555555555555555555555k.",
-    "...k6666666666666666666666666666666666666k..",
-    "....k11111111111111111111111111111111111k...",
-    ".....k222222222222222222222222222222222k....",
-    "......k2222222222222222222222222222222k.....",
-    ".......k33333333333333333333333333333k......",
-    "........k333333333333333333333333333k.......",
-    ".........k3333333333333333333333333k........",
-    "..........k33333333333333333333333k.........",
-    "...........k444444444444444444444k..........",
-    "............k4444444444444444444k...........",
-    ".............k44444444444444444k............",
-    "..............k444444444444444k.............",
+    "....AghhhhhhhhhhhhhhVvvVhhHHHHHHHHHHHHgA....",
+    "....AghhhhhhhhhhhhhhVvvVhhHHHHHHHHHHHHgA....",
+    ".....AhhhhhhhhhhhhhhVvvVhhHHHHHHHHHHHHA.....",
+    ".....AhhhhhhhhhhhhhhVvvVhhHHHHHHHHHHHHA.....",
+    "......AhhhhhhhhhhhhhVvvVhhHHHHHHHHHHHA......",
+    "......AhhhhhhhhhhhhhVvvVhhHHHHHHHHHHHA......",
+    ".......AhhhhhhhhhhhhVvvVhHHHHHHHHHHHA.......",
+    "........AhhhhhhhhhhhVvvVhHHHHHHHHHHA........",
+    ".........AhhhhhhhhhhVvvVhHHHHHHHHHA.........",
+    "..........AhhhhhhhhhVvvVhHHHHHHHHA..........",
+    "...........AhhhhhhhhVvvVhHHHHHHHA...........",
+    "............AhhhhhhhVvvVHHHHHHHA............",
+    ".............AhhhhhhVvvVHHHHHHA.............",
     ".............k99999k44444k99999k............",
     ".............kmmmmmk.....kmmmmmk............",
     ".............kmmmmmk.....kmmmmmk............",
@@ -706,9 +708,12 @@
     screen.style.width=cw+'px'; screen.style.height=ch+'px';
     screen.width=Math.floor(cw*dpr); screen.height=Math.floor(ch*dpr);
     sctx.imageSmoothingEnabled=false;
-    viewScale=Math.max(1, Math.floor(Math.min(screen.width/BASE_W, screen.height/BASE_H)));
-    offX=Math.floor((screen.width - BASE_W*viewScale)/2);
-    offY=Math.floor((screen.height- BASE_H*viewScale)/2);
+    // FULLER SCREEN: fractional scale that FILLS the full viewport height (kills the big letterbox bars).
+    // On tall phones the width slightly overflows and is center-cropped (only decorative banks, never the
+    // center channel/boat); on very wide desktops it's a tall portrait window filling full height.
+    viewScale = screen.height / BASE_H;
+    offX=Math.round((screen.width - BASE_W*viewScale)/2);
+    offY=Math.round((screen.height- BASE_H*viewScale)/2);   // ~0 by construction (no vertical bars/crop)
   }
   window.addEventListener('resize', resize);
   window.addEventListener('orientationchange', ()=>setTimeout(resize,120));
@@ -791,7 +796,7 @@
   }
 
   // steering feel (unchanged tuning) / jump (unchanged big-hop tuning)
-  const STEER_ACC = 0.6, STEER_MAX = 0.30, STEER_FRICTION = 0.80;
+  const STEER_ACC = 0.82, STEER_MAX = 0.38, STEER_FRICTION = 0.80;   // snappier arrows (was 0.6 / 0.30); still not twitchy
   const JUMP_V0 = 220, GRAVITY = 440;   // apex ~55px(virtual), ~1.0s airtime; ramp jumps bigger
   function doJump(){ if(G.state!=='play'||G.airborne) return; G.airborne=true; G.jumpVel=JUMP_V0; G.jumpH=0.001; G.squashY=1.36; AudioFX.jump(); }
   function landBoat(){ G.airborne=false; G.jumpH=0; G.jumpVel=0; G.squashY=0.70; AudioFX.land(); }
@@ -912,8 +917,24 @@
     G.spawnT=0.6; G.hawkT=2.0; G.throwCool=0; G.speed=0.34; G.t=0; G.shake=0; G.cluckT=4;
     G.curve=0; G.curveTarget=0; G.curveTimer=2.5; G.curveEase=0.8;
     G.airborne=false; G.jumpH=0; G.jumpVel=0; G.squashY=1;
+    G.storm=null; G.stormT=10+Math.random()*8;        // first storm rolls in ~10-18s into the run
     held.left=held.right=false; updateHUD();
   }
+
+  /* ===== STORM EVENT: occasional telegraphed squall. Sass auto-pops an umbrella -> lightning does NO harm. ===== */
+  function startStorm(){ G.storm={ t:0, dur:6.4, dark:0, flash:0, boltT:0.8, boltX:CX, struck:false }; }
+  function updateStorm(dt){
+    const s=G.storm; s.t+=dt;
+    const In=Math.min(1, s.t/1.3), Out=Math.min(1, Math.max(0,(s.dur-s.t)/1.5));
+    s.dark=Math.max(0, Math.min(1, Math.min(In,Out)));               // darkness rolls in, holds, then clears
+    if(s.flash>0) s.flash-=dt*2.4;
+    if(s.t>1.1 && s.t<s.dur-1.1){                                     // lightning only mid-storm
+      s.boltT-=dt;
+      if(s.boltT<=0){ s.flash=1; s.boltX=CX+(Math.random()*2-1)*120; AudioFX.thunder(); s.boltT=0.9+Math.random()*1.4; }
+    }
+    if(s.t>=s.dur){ G.storm=null; G.stormT=15+Math.random()*11; }     // recur every ~15-26s
+  }
+  function umbrellaUp(){ const s=G.storm; if(!s) return 0; return Math.max(0, Math.min(1, Math.min(s.t/0.9,(s.dur-s.t)/1.0))); }
 
   // CHICKENS are the headline rescue collectible: ~30% of spawns. ramp ~8%, bonus pickups ~20%, obstacles ~42%.
   function spawn(){
@@ -943,6 +964,9 @@
     const spawnEvery = Math.max(0.42, 0.95 - G.dist/3200);
     waterPhase += dt * (1.2 + G.speed*2);
     G.dist += G.speed*dt*60; G.score += G.speed*dt*60*0.6;
+
+    // storm event ticker (telegraphed, harmless thanks to the auto-umbrella)
+    if(!G.storm){ if((G.stormT-=dt)<=0) startStorm(); } else updateStorm(dt);
 
     const dir=(held.left?-1:0)+(held.right?1:0);
     G.vx += dir*STEER_ACC*dt; G.vx *= STEER_FRICTION;
@@ -981,12 +1005,16 @@
     for(const hk of G.hawks){
       if(hk.dead) continue;
       hk.t += dt;
-      hk.x += (bScreenX-hk.x)*Math.min(1, dt*0.6);          // homes toward the boat
-      hk.y += (hk.t<0.9 ? 55 : 200)*dt;                      // telegraphed approach, then dives
-      if(!hk.struck && hk.y>=bY-14){
+      // DODGEABLE: only track the boat GENTLY during the telegraph; once it commits to the dive it flies
+      // straight, so steering left/right can actually get you out of the way (dodge OR throw a chicken).
+      if(hk.t<0.95){ hk.x += (bScreenX-hk.x)*Math.min(1, dt*0.22); }
+      hk.y += (hk.t<0.95 ? 64 : 250)*dt;                     // telegraphed approach, then a fast close dive
+      if(!hk.struck && hk.y>=bY-12){
         hk.struck=true; hk.dead=true;
-        if(G.inv<=0){ G.lives--; G.inv=1.4; G.shake=0.4; AudioFX.hit();
+        const dx=Math.abs(hk.x - xAt(G.boatX,0.9));          // must STILL be aligned at impact -> dodge by steering away
+        if(dx<24 && G.inv<=0){ G.lives--; G.inv=1.4; G.shake=0.4; AudioFX.hit();
           if(G.lives<=0){ gameOver(); return; } else AudioFX.lifeLost(); }
+        else if(dx>=24){ G.pops.push({ x:hk.x, y:bY-8, age:0 }); }   // clean near-miss puff
       }
     }
     if(G.hawks.length>10) G.hawks=G.hawks.filter(h=>!h.dead);
@@ -1230,6 +1258,42 @@
       drawSprite(SPR_CHICKEN, pr.x, pr.y, 1.2*sp, 1.2/sp);
     }
   }
+  /* ===== STORM rendering (dark sky, rolling clouds, lightning, Sass's auto-umbrella) ===== */
+  function drawStormCloud(x,y,sc){
+    const w=Math.round(16*sc);
+    bx.fillStyle='#272d3c'; bx.fillRect(Math.round(x-w), Math.round(y), w*2, Math.round(7*sc));
+    bx.fillStyle='#333a4c'; bx.fillRect(Math.round(x-w+2), Math.round(y-3*sc), w*2-4, Math.round(5*sc));
+    bx.fillStyle='#434b60'; bx.fillRect(Math.round(x-w*0.55), Math.round(y-5*sc), Math.round(w*1.1), Math.round(4*sc));
+  }
+  function drawBolt(x){
+    bx.strokeStyle='#fdf6c0'; bx.lineWidth=2; bx.beginPath();
+    let yy=0, xx=x; bx.moveTo(xx,yy);
+    while(yy<HZ+34){ yy+=12+Math.random()*10; xx+=(Math.random()*2-1)*16; bx.lineTo(xx,yy); }
+    bx.stroke(); bx.strokeStyle='rgba(255,255,255,0.8)'; bx.lineWidth=1; bx.stroke();
+  }
+  function drawUmbrella(cx, cy, up){
+    const yo=(1-up)*36, x=cx, y=cy+yo, w=30;
+    bx.fillStyle='#7a5226'; bx.fillRect(Math.round(x-1), Math.round(y), 2, 30);          // pole down to the boat
+    for(let r=0;r<14;r++){                                                                // pink dome
+      const ww=Math.round(Math.sqrt(Math.max(0,1-(r/14)*(r/14)))*w);
+      bx.fillStyle=(r<3)?'#ff9ecf':'#ff6fae'; bx.fillRect(Math.round(x-ww), Math.round(y-r), ww*2, 1);
+    }
+    bx.fillStyle='#a3396e';                                                               // ribs
+    for(let i=-2;i<=2;i++){ bx.fillRect(Math.round(x+i*(w/2.6)), Math.round(y-13), 1, 13); }
+    bx.fillStyle='#d44f8e';                                                               // scalloped hem
+    for(let s=-w;s<w;s+=8){ bx.fillRect(Math.round(x+s), Math.round(y), 5, 2); }
+    bx.fillStyle='#ffd23f'; bx.fillRect(Math.round(x-1), Math.round(y-16), 2, 3);         // top knob
+  }
+  function drawStorm(){
+    const s=G.storm, d=s.dark;
+    bx.fillStyle='rgba(10,14,40,'+(0.62*d)+')'; bx.fillRect(0,0,BASE_W,BASE_H);           // darken the scene
+    bx.globalAlpha=Math.min(1,d*1.15);                                                    // rolling dark clouds up top
+    for(let i=0;i<5;i++){ const cw=((i*83 + Math.floor(waterPhase*9)) % (BASE_W+90))-45; drawStormCloud(cw, 16+i*9, 1.3+(i%3)*0.5); }
+    bx.globalAlpha=1;
+    const bxp=xAt(G.boatX,0.9), byp=yAt(0.9)-12-(G.jumpH||0);
+    drawUmbrella(bxp, byp-48, umbrellaUp());                                              // Sass's auto-umbrella over the boat
+    if(s.flash>0){ bx.fillStyle='rgba(235,245,255,'+(0.55*Math.min(1,s.flash))+')'; bx.fillRect(0,0,BASE_W,BASE_H); drawBolt(s.boltX); }
+  }
   function render(){
     bx.clearRect(0,0,BASE_W,BASE_H);
     if(G.state==='kick'){ drawKickScene(); }
@@ -1239,6 +1303,7 @@
       if(G.state==='capsize'){ drawCapsize(); }
       else { drawItems(); drawHawks(); drawBoat(); drawProjectiles(); }
       drawPops();
+      if(G.storm) drawStorm();                          // storm spectacle over the play scene
     }
     let sx=offX, sy=offY;
     if(G.shake>0){ sx+=(Math.random()*2-1)*viewScale; sy+=(Math.random()*2-1)*viewScale; }
@@ -1325,10 +1390,13 @@
     reset(); G.state='play'; show('play'); AudioFX.start(); AudioFX.startBed();
   }
   function gameOver(){ if(G.state!=='play') return; G.lastCapsize=false; endRun(); }
+  // LSL TRIVIA TRIGGER CHANCE at each game-over. 1.0 = ALWAYS (for testing). Dial back to 0.05 for the
+  // real 1-in-20 rate.  >>> constant name: LSL_CHANCE <<<
+  const LSL_CHANCE = 1.0;
   function endRun(){
     G.state='over'; AudioFX.stopBed();
-    // LSL TRIVIA GATE: 1-in-20 (5%) chance at EACH player's game-over -> correct unlocks the Kickin Chicken bonus
-    if(Math.random()<0.05){ startTrivia(); }
+    // LSL TRIVIA GATE -> a correct answer unlocks the Kickin Chicken bonus round
+    if(Math.random() < LSL_CHANCE){ startTrivia(); }
     else { finalizeRun(); }
   }
   // record the final score (incl. any bonus), post to the boat board, then continue the normal flow
@@ -1518,17 +1586,25 @@
   async function loadBoard(){
     const el=$('boardList'); el.innerHTML='<li><span class="rk">&hellip;</span><span class="sc">loading</span></li>';
     try{
-      const r=await fetchT(SCORES_ENDPOINT+'?game='+GAME,{},3500); if(!r.ok) throw 0;
-      const d=await r.json(); const top=Array.isArray(d.top)?d.top.slice(0,10):[];
+      const r=await fetchT(SCORES_ENDPOINT+'?game='+GAME,{},3500); if(!r.ok) throw new Error('HTTP '+r.status);
+      const d=await r.json();
+      // TOLERANT PARSE: accept {top:[...]}, {scores:[...]}, {data:[...]}, {leaderboard:[...]} or a bare array,
+      // and accept score/initials under several common field names (guards against a backend shape mismatch).
+      const list = Array.isArray(d) ? d
+                 : (d && (d.top || d.scores || d.data || d.leaderboard || d.rows)) || [];
+      const top = Array.isArray(list) ? list.slice(0,10) : [];
       el.innerHTML='';
       if(!top.length){ el.innerHTML='<li><span class="rk">&mdash;</span><span class="sc">no scores yet</span></li>'; return; }
       top.forEach((row,i)=>{
         const li=document.createElement('li');
-        const ini=(row.initials||'---').toUpperCase().slice(0,3);
-        li.innerHTML='<span class="rk">'+(i+1)+'. '+ini+'</span><span class="sc">$'+Number(row.score||0).toLocaleString()+'</span>';
+        const iniRaw = row.initials!=null?row.initials : (row.ini!=null?row.ini : (row.name!=null?row.name : '---'));
+        const scRaw  = row.score!=null?row.score : (row.points!=null?row.points : (row.pts!=null?row.pts : 0));
+        const ini=String(iniRaw||'---').toUpperCase().slice(0,3);
+        li.innerHTML='<span class="rk">'+(i+1)+'. '+ini+'</span><span class="sc">$'+Number(scRaw||0).toLocaleString()+'</span>';
         el.appendChild(li);
       });
-    }catch(e){ el.innerHTML='<li><span class="rk">&mdash;</span><span class="sc">couldn\u2019t load</span></li>'; }
+    }catch(e){ try{ console.warn('[boat] leaderboard load failed:', e && e.message); }catch(_){}
+      el.innerHTML='<li><span class="rk">&mdash;</span><span class="sc">couldn\u2019t load</span></li>'; }
   }
   function openBoard(from){ boardReturn=from; show('scrBoard'); loadBoard(); }
 

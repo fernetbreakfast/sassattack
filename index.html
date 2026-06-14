@@ -147,7 +147,12 @@
     // buttons, which are separate elements) behave normally, so the secret
     // stays secret and nothing else is affected.
     logo.style.cursor = 'default';
+    // EGG TRIGGER TEMPORARILY DISABLED -- the egg-center tap is a no-op for now.
+    // The full cutscene (startCutscene, canvas animation, synth love song) is kept
+    // intact below so it can be re-enabled later by restoring the listener body.
+    const EGG_ENABLED = false;
     logo.addEventListener('click', (e) => {
+      if (!EGG_ENABLED) return;   // disabled: tapping the egg center does nothing
       const r = logo.getBoundingClientRect();
       if (!r.width || !r.height) return;
       const nx = (e.clientX - r.left) / r.width;

@@ -56,15 +56,19 @@
   #best{ font-size:12px; color:#ffd23f; letter-spacing:1px; }
   #pad{ position:absolute; left:0; right:0; bottom:0; display:flex; justify-content:space-between;
     padding:0 14px max(18px,env(safe-area-inset-bottom)); pointer-events:none; }
-  .dbtn{ pointer-events:auto; width:clamp(96px,30vw,140px); height:clamp(96px,30vw,140px);
+  .dbtn{ pointer-events:auto; width:clamp(72px,24vw,120px); height:clamp(72px,24vw,120px);
     border-radius:24px; border:3px solid rgba(255,255,255,.35); background:rgba(10,16,40,.42);
     color:#fff; font-size:48px; font-weight:900; display:flex; align-items:center; justify-content:center;
     backdrop-filter:blur(2px); transition:transform .06s, background .1s; }
   .dbtn:active{ background:rgba(0,224,255,.35); transform:scale(.96); }
-  .dbtn.jump{ width:clamp(74px,21vw,104px); height:clamp(74px,21vw,104px);
-    font-size:clamp(15px,4.6vw,20px); align-self:flex-end; margin-bottom:8px;
+  .dbtn.jump{ width:clamp(60px,18vw,92px); height:clamp(60px,18vw,92px);
+    font-size:clamp(12px,3.8vw,17px); align-self:flex-end; margin-bottom:8px;
     border-color:rgba(255,210,63,.6); background:rgba(60,42,8,.42); color:#ffd23f; letter-spacing:1px; }
   .dbtn.jump:active{ background:rgba(255,210,63,.35); }
+  .dbtn.throw{ width:clamp(60px,18vw,92px); height:clamp(60px,18vw,92px);
+    font-size:clamp(12px,3.8vw,17px); align-self:flex-end; margin-bottom:8px;
+    border-color:rgba(120,255,150,.6); background:rgba(18,56,28,.46); color:#9bffb4; letter-spacing:1px; }
+  .dbtn.throw:active{ background:rgba(120,255,150,.32); }
   #mute{ position:absolute; top:max(8px,env(safe-area-inset-top)); left:50%; transform:translateX(-50%);
     pointer-events:auto; background:rgba(8,12,30,.6); border:2px solid #2b3566; color:#cdd6ff;
     border-radius:10px; font-size:13px; font-weight:700; padding:6px 12px; cursor:pointer; letter-spacing:1px; }
@@ -83,6 +87,7 @@
   </div>
 
   <div id="pad" class="hidden">
+    <button class="dbtn throw" id="btnThrow" aria-label="throw chicken">THROW</button>
     <button class="dbtn" id="btnLeft" aria-label="left">&#9664;</button>
     <button class="dbtn jump" id="btnJump" aria-label="jump">JUMP</button>
     <button class="dbtn" id="btnRight" aria-label="right">&#9654;</button>
@@ -97,7 +102,8 @@
       <span class="chick"><b>Rescue the chickens</b> floating down the river</span> &mdash; steer into them for big points!
       <b>Dodge</b> rocks, logs &amp; buoys (they cost a life). Grab eggs &amp; hotdogs for bonus.
       <br><br>
-      <b>&#9664; / &#9654;</b> steer &middot; <b>JUMP</b> (&#9650; / Space) to hop ramps &amp; clear obstacles. 3 lives.
+      <b>&#9664; / &#9654;</b> steer &middot; <b>JUMP</b> (&#9650; / Space) hops ramps &amp; clears obstacles.
+      <br>Watch the sky &mdash; <b>THROW</b> a rescued chicken (F) to knock out diving <b>hawks!</b> 3 lives.
     </div>
     <button class="btn" id="btnStart">START</button>
     <p class="small pixfont">a Sass Attack joint</p>
@@ -137,6 +143,14 @@
       }catch(e){ ctx=null; } return ctx;
     }
     function resume(){ try{ if(ctx && ctx.state!=='running') ctx.resume(); }catch(e){} }
+    // custom processed chicken pickup clip via <audio>; only plays once the ctx is unlocked + not muted
+    let chickEl=null;
+    try{ chickEl=new Audio('/boat/snd/chickpick.mp3'); chickEl.preload='auto'; chickEl.load(); }catch(e){ chickEl=null; }
+    function chickpick(){
+      if(muted || !ctx || !chickEl) return;
+      try{ const c=(typeof chickEl.cloneNode==='function') ? chickEl.cloneNode() : chickEl;
+        c.volume=0.95; const p=c.play(); if(p && p.catch) p.catch(()=>{}); }catch(e){}
+    }
     function tone(freq,dur,type,peak,slideTo,delay){
       if(!ensure()||muted) return;
       const t=ctx.currentTime+(delay||0); const o=ctx.createOscillator(), g=ctx.createGain();
@@ -167,6 +181,9 @@
     const land     = () => { noise(0.16,0.22,0,700); tone(240,0.12,'sine',0.10,110); };
     const turn     = () => tone(540,0.09,'triangle',0.05,660);
     const ramp     = () => arp([420,640,940],0.05,0.12,'square',0.15);
+    const throwfx  = () => { noise(0.13,0.16,0,2600); tone(320,0.14,'square',0.10,950); };                 // chicken whoosh
+    const screech  = () => { tone(1500,0.16,'sawtooth',0.10,2300); tone(2100,0.12,'sawtooth',0.07,1500,0.05); }; // raptor screech
+    const hawkHit  = () => { noise(0.18,0.22,0,1200); tone(520,0.16,'square',0.13,180); arp([900,640,440],0.05,0.12,'triangle',0.10); };
     // chicken cluck: a short pitched chirp gliding down + a band-noise transient = "bok"
     function bok(delay,base){ const b=base||880;
       tone(b,0.06,'square',0.11,b*0.55,delay);
@@ -177,17 +194,50 @@
                            tone(640,0.13,'square',0.12,1240,0.24); tone(940,0.10,'triangle',0.06,1560,0.26); };
 
     let musicGain=null, loopTimer=null, bedOn=false, nextAt=0;
-    const BPM=120, BEAT=60/BPM, BAR=BEAT*4, LOOP=BAR*4;
-    const N={ C3:130.81,E3:164.81,G3:196,A3:220,B3:246.94,C4:261.63,D4:293.66,E4:329.63,G4:392,A4:440,B4:493.88,C5:523.25,D5:587.33,E5:659.25 };
-    const BASS=['C3','C3','A3','A3','G3','G3','E3','E3','C3','C3','A3','A3','G3','G3','G3','B3'];
-    const LEAD=['C5','E5','G4','E5','A4','C5','E5','C5','G4','E5','D5','E5','G4','D5','B4','D5'];
-    function mnote(t0,freq,dur,type,peak){ if(muted||!ctx||!musicGain) return;
-      const o=ctx.createOscillator(), g=ctx.createGain(); o.type=type; o.frequency.setValueAtTime(freq,t0);
-      g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(peak,t0+0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001,t0+dur); o.connect(g); g.connect(musicGain); o.start(t0); o.stop(t0+dur+0.05); }
-    function playLoop(t0){ const step=BEAT/2;
-      for(let i=0;i<16;i++){ const t=t0+i*step; mnote(t,N[BASS[i]],step*1.6,'triangle',0.10); if(i%2===0) mnote(t,N[LEAD[i]],step*0.9,'square',0.07); }
-      return LOOP; }
+    // ===== ORIGINAL RAGTIME — jaunty stride (oom-pah left hand) + syncopated right hand =====
+    const BPM=100, BEAT=60/BPM;                     // ~100bpm, honky-tonk feel
+    const N={ C2:65.41,D2:73.42,E2:82.41,F2:87.31,G2:98.00,A2:110.00,B2:123.47,
+              C3:130.81,D3:146.83,E3:164.81,F3:174.61,G3:196.00,A3:220.00,B3:246.94,
+              C4:261.63,D4:293.66,E4:329.63,F4:349.23,G4:392.00,A4:440.00,B4:493.88,
+              C5:523.25,D5:587.33,E5:659.25,F5:698.46,G5:783.99,A5:880.00,B5:987.77,C6:1046.50 };
+    // piano-ish voice: detuned partials + soft octave, fast attack + exp decay
+    function pnote(t0,name,dur,peak){
+      if(muted||!ctx||!musicGain||!name) return; const freq=N[name]; if(!freq) return;
+      [[1,'triangle',1.0],[1.004,'sine',0.55],[2.01,'sine',0.16]].forEach((v)=>{
+        const o=ctx.createOscillator(), g=ctx.createGain();
+        o.type=v[1]; o.frequency.setValueAtTime(freq*v[0],t0);
+        g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime((peak||0.12)*v[2],t0+0.008);
+        g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+        o.connect(g); g.connect(musicGain); o.start(t0); o.stop(t0+dur+0.05);
+      });
+    }
+    // left hand: per bar -> 4 bass roots (on the beat) + chord stabs (on the "and")
+    const LH=[
+      { r:['C2','G2','C2','G2'], c:[['C3','E3','G3'],['C3','E3','G3'],['C3','E3','G3'],['C3','E3','G3']] },
+      { r:['G2','D3','G2','D3'], c:[['G3','B3','F4'],['G3','B3','F4'],['G3','B3','F4'],['G3','B3','F4']] },
+      { r:['F2','C3','F2','C3'], c:[['F3','A3','C4'],['F3','A3','C4'],['F3','A3','C4'],['F3','A3','C4']] },
+      { r:['C2','G2','G2','D3'], c:[['C3','E3','G3'],['C3','E3','G3'],['G3','B3','F4'],['G3','B3','F4']] }
+    ];
+    // right hand: syncopated melody, [note, beats] per bar (each bar sums to 4 beats)
+    const RH=[
+      [['E5',0.75],['G5',0.25],['C6',0.5],['G5',0.5],['E5',0.75],['D5',0.25],['C5',0.5],['G4',0.5]],
+      [['D5',0.75],['F5',0.25],['G5',0.5],['B4',0.5],['D5',0.75],['B4',0.25],['G4',0.5],['F4',0.5]],
+      [['A4',0.75],['C5',0.25],['F5',0.5],['A5',0.5],['G5',0.75],['E5',0.25],['C5',0.5],['A4',0.5]],
+      [['G4',0.5],['E5',0.5],['C5',0.5],['G4',0.5],['D5',0.5],['F5',0.5],['B4',0.5],['G4',0.5]]
+    ];
+    function playLoop(t0){
+      for(let bar=0;bar<4;bar++){
+        const lh=LH[bar];
+        for(let beat=0;beat<4;beat++){
+          const tb=t0+(bar*4+beat)*BEAT;
+          pnote(tb, lh.r[beat], BEAT*0.9, 0.13);                            // "oom" bass on the beat
+          lh.c[beat].forEach(nn=> pnote(tb+BEAT*0.5, nn, BEAT*0.42, 0.06)); // "pah" chord on the &
+        }
+      }
+      let mt=0;
+      for(let bar=0;bar<4;bar++){ for(const ev of RH[bar]){ if(ev[0]) pnote(t0+mt*BEAT, ev[0], ev[1]*BEAT*0.95, 0.15); mt+=ev[1]; } }
+      return 16*BEAT;                                                       // 4 bars -> clean loop
+    }
     function schedule(){ if(!bedOn||!ctx) return; while(nextAt<ctx.currentTime+0.3){ nextAt+=playLoop(nextAt); } loopTimer=setTimeout(schedule,120); }
     function startBed(){ stopBed(); bedOn=true; if(!ensure()) return; resume();
       try{ musicGain=ctx.createGain(); musicGain.gain.value=0.6; musicGain.connect(master); }catch(e){ musicGain=null; }
@@ -197,7 +247,8 @@
         setTimeout(()=>{ try{ mg.disconnect(); }catch(e){} },500); } else musicGain=null; }
     function setMuted(m){ muted=m; try{ localStorage.setItem('boat_muted', m?'1':'0'); }catch(e){} if(master) master.gain.value=m?0:0.9; }
     return { ensure, resume, isMuted:()=>muted, setMuted,
-             pickup, bonus, hit, lifeLost, start, over, jump, land, turn, ramp, cluck, rescue, startBed, stopBed };
+             pickup, bonus, hit, lifeLost, start, over, jump, land, turn, ramp, cluck, rescue,
+             chickpick, throwfx, screech, hawkHit, startBed, stopBed };
   })();
 
   /* ===== 16-bit PALETTE + SPRITES (chunky pixel-art, integer-scaled buffer) ===== */
@@ -206,19 +257,19 @@
     "............................................",
     "............................................",
     "..........hhhh.................pppp.........",
-    ".........hHHHHh...............pPPPPp........",
-    "........hHHHHHHh.............pPPPPPPp.......",
-    ".......kHHHHHHHHk...........pPPPPPPPPp......",
-    ".........kxxxxk.............pPsssssssPp.....",
-    ".........xggGxx.............pPsekseksPp.....",
-    "..........sSSt..............pPskkskksPp.....",
-    "..........sSSt..............pPsdsssdsPp.....",
-    ".........nNNNNn.............pPssOOOssPp.....",
-    "........nNNNNNNn..............cCCCCCc.......",
-    ".......kNNNNNNNNk............cCCCCCCCc......",
-    ".......kNnNNNNnNk...........kCCCCCCCCCk.....",
-    ".......kNNNNNNNNk...........kCuCCCCuCk......",
-    "........NNNNNNNN.............CCCCCCCCC......",
+    "........hhHHHHhh..............pPPPPp........",
+    ".......hHHHHHHHHh............pPPPPPPp.......",
+    ".......hHHHHHHHHh...........pPPPPPPPPp......",
+    ".......kHHHHHHHHk...........pPPoooPPPp......",
+    "........kxxxxxxk............pPPPoPPPPp......",
+    ".........kgGGgk.............pPPPPPPPPp......",
+    ".........sSSSSt..............vPPPPPPv.......",
+    ".........sSSSSt..............VvPPPPvV.......",
+    "........nNNNNNNn..............pPPPPp........",
+    ".......kNNNNNNNNk............cCCCCCCc.......",
+    ".......kNNNNNNNNk...........kCCCCCCCCk......",
+    ".......kNnNNNNnNk...........kCuCCCCuCk......",
+    "........NNNNNNNN.............CCCCCCCC.......",
     "..k555555555555555555555555555555555555555k.",
     "...k6666666666666666666666666666666666666k..",
     "....k11111111111111111111111111111111111k...",
@@ -255,6 +306,32 @@
     "..wwwwwwww......",
     "...zz..zz.......",
     "................"
+  ];
+  const SPR_HAWK_A = [
+    "..................",
+    "U.......ww.......U",
+    "UUL....kwwk....LUU",
+    ".UllL..wwww..LllU.",
+    "...lllLRzzRLlll...",
+    ".....llRrrRll.....",
+    ".......RrrR.......",
+    ".......RrrR.......",
+    ".......RRRR.......",
+    ".......z..z.......",
+    ".................."
+  ];
+  const SPR_HAWK_B = [
+    "U................U",
+    "UUL.....ww.....LUU",
+    ".UllL..kwwk..LllU.",
+    "...lllLwwwwLlll...",
+    ".....llRzzRll.....",
+    ".......RrrR.......",
+    ".......RrrR.......",
+    ".......RrrR.......",
+    ".......RRRR.......",
+    ".......z..z.......",
+    ".................."
   ];
   const SPR_ROCK = [
     "..............",
@@ -412,6 +489,7 @@
   ];
   const OBSTACLES = [ SPR_ROCK, SPR_LOG, SPR_BUOY ];
   const CHICKEN_PTS = 150;
+  const HAWK_PTS = 120;
 
   /* ===== buffer / scaling (16-bit: doubled internal resolution, integer-scaled blit) ===== */
   const screen = $('screen');
@@ -460,7 +538,8 @@
 
   /* ===== state ===== */
   const G = { state:'title', score:0, dist:0, best:0, lives:3, rescued:0,
-              boatX:0, vx:0, inv:0, items:[], pops:[], spawnT:0, speed:0, t:0, shake:0, cluckT:5,
+              boatX:0, vx:0, inv:0, items:[], pops:[], hawks:[], projectiles:[],
+              spawnT:0, hawkT:0, throwCool:0, speed:0, t:0, shake:0, cluckT:5,
               curve:0, curveTarget:0, curveTimer:0, curveEase:0.8,
               airborne:false, jumpH:0, jumpVel:0, squashY:1 };
   try{ G.best = parseInt(localStorage.getItem('boat_best')||'0',10)||0; }catch(e){}
@@ -473,9 +552,29 @@
   function doJump(){ if(G.state!=='play'||G.airborne) return; G.airborne=true; G.jumpVel=JUMP_V0; G.jumpH=0.001; G.squashY=1.36; AudioFX.jump(); }
   function landBoat(){ G.airborne=false; G.jumpH=0; G.jumpVel=0; G.squashY=0.70; AudioFX.land(); }
 
+  // ----- sky enemies (hawks) + throw-chicken defense -----
+  function spawnHawk(){
+    const x=CX + (Math.random()*2-1)*130;
+    G.hawks.push({ x, y:HZ-8, t:0, dead:false, struck:false });
+    AudioFX.screech();                         // audible telegraph
+  }
+  // RESOURCE MODEL: each throw spends one RESCUED chicken (need >=1) -> risk/reward
+  function doThrow(){
+    if(G.state!=='play' || G.throwCool>0) return;
+    if(G.rescued<=0){ AudioFX.turn(); return; } // out of ammo -> soft tick
+    G.rescued--; G.throwCool=0.28; updateHUD();
+    const x=xAt(G.boatX,0.9), y=yAt(0.9)-30;
+    let tx=x, best=1e9;                          // aim at the nearest live hawk
+    for(const hk of G.hawks){ if(hk.dead) continue; const d=Math.abs(hk.x-x)+Math.abs(hk.y-y); if(d<best){ best=d; tx=hk.x; } }
+    const vx=Math.max(-150, Math.min(150, (tx-x)*1.5));
+    G.projectiles.push({ x, y, vx, vy:-410, t:0, dead:false });
+    AudioFX.throwfx();
+  }
+
   function reset(){
     G.score=0; G.dist=0; G.lives=3; G.rescued=0; G.boatX=0; G.vx=0; G.inv=0;
-    G.items.length=0; G.pops.length=0; G.spawnT=0.6; G.speed=0.34; G.t=0; G.shake=0; G.cluckT=4;
+    G.items.length=0; G.pops.length=0; G.hawks.length=0; G.projectiles.length=0;
+    G.spawnT=0.6; G.hawkT=6; G.throwCool=0; G.speed=0.34; G.t=0; G.shake=0; G.cluckT=4;
     G.curve=0; G.curveTarget=0; G.curveTimer=2.5; G.curveEase=0.8;
     G.airborne=false; G.jumpH=0; G.jumpVel=0; G.squashY=1;
     held.left=held.right=false; updateHUD();
@@ -526,6 +625,38 @@
     G.spawnT -= dt;
     if(G.spawnT<=0){ spawn(); G.spawnT = spawnEvery*(0.7+Math.random()*0.6); }
 
+    // ----- hawks: begin after a short grace, then periodically (ramps with distance) -----
+    if(G.dist>500){ G.hawkT -= dt; if(G.hawkT<=0){ spawnHawk(); G.hawkT = Math.max(3.0, 7.5 - G.dist/1500)*(0.7+Math.random()*0.6); } }
+    const bScreenX=xAt(G.boatX,0.9), bY=yAt(0.9)-12;
+    for(const hk of G.hawks){
+      if(hk.dead) continue;
+      hk.t += dt;
+      hk.x += (bScreenX-hk.x)*Math.min(1, dt*0.6);          // homes toward the boat
+      hk.y += (hk.t<0.9 ? 55 : 200)*dt;                      // telegraphed approach, then dives
+      if(!hk.struck && hk.y>=bY-14){
+        hk.struck=true; hk.dead=true;
+        if(G.inv<=0){ G.lives--; G.inv=1.4; G.shake=0.4; AudioFX.hit();
+          if(G.lives<=0){ gameOver(); return; } else AudioFX.lifeLost(); }
+      }
+    }
+    if(G.hawks.length>10) G.hawks=G.hawks.filter(h=>!h.dead);
+    // ----- thrown chickens knock hawks out of the sky -----
+    for(const pr of G.projectiles){
+      if(pr.dead) continue;
+      pr.t+=dt; pr.x+=pr.vx*dt; pr.y+=pr.vy*dt;
+      if(pr.y<HZ-30 || pr.t>1.8){ pr.dead=true; continue; }
+      for(const hk of G.hawks){
+        if(hk.dead) continue;
+        if(Math.abs(pr.x-hk.x)<24 && Math.abs(pr.y-hk.y)<24){
+          hk.dead=true; pr.dead=true; G.score+=HAWK_PTS;
+          G.pops.push({ x:hk.x, y:hk.y, age:0 });            // feather burst
+          AudioFX.hawkHit(); break;
+        }
+      }
+    }
+    if(G.projectiles.length>14) G.projectiles=G.projectiles.filter(p=>!p.dead);
+    if(G.throwCool>0) G.throwCool-=dt;
+
     for(const it of G.items){
       if(it.gone) continue;
       it.t += G.speed*dt;
@@ -536,7 +667,7 @@
         if(dxRel<thresh){
           if(it.kind==='chicken'){
             it.hit=true; it.gone=true; G.rescued++; G.score += CHICKEN_PTS;
-            AudioFX.rescue();
+            AudioFX.chickpick();   // play the processed pickup clip
             G.pops.push({ x:xAt(it.xRel,it.t), y:yAt(it.t), age:0 });   // happy rescue pop
           } else if(it.kind==='pick'){
             it.hit=true; it.gone=true; G.score += it.pts; (it.pts>=100?AudioFX.bonus:AudioFX.pickup)();
@@ -556,18 +687,57 @@
   }
 
   /* ===== drawing (richer 16-bit scene: shaded sky/banks/water + foam + sparkle) ===== */
+  // stable per-index pseudo-random for placing vegetation
+  function hash(i){ const x=Math.sin(i*127.1+0.5)*43758.5453; return x-Math.floor(x); }
+  function drawBush(x,y,s,variety){
+    const D=['#19582a','#134f24','#205e30'][variety%3];
+    const M=['#2f9a4a','#2a8b42','#37a050'][variety%3];
+    const Lc=['#4fb86a','#46b35f','#5fc878'][variety%3];
+    bx.fillStyle=D;  bx.fillRect(x-s,   y-s+1, s*2,   s+1);            // shaded base
+    bx.fillStyle=M;  bx.fillRect(x-s+1, y-s,   s*2-2, s);             // body
+    bx.fillStyle=M;  bx.fillRect(x-s+2, y-s-2, Math.max(2,s*2-4), 3);// top mound
+    bx.fillStyle=Lc; bx.fillRect(x-s+2, y-s-1, Math.max(2,s-1), 2);  // sunlit highlight
+  }
+  function drawReed(x,baseY,h,ph){
+    const sway=Math.sin(ph)*2;
+    bx.fillStyle='#2f9a4a';
+    for(let i=0;i<h;i++){ bx.fillRect(Math.round(x+sway*(i/h)), baseY-i, 2, 1); }
+    bx.fillStyle='#3fae5c'; bx.fillRect(Math.round(x+sway), baseY-h, 1, Math.max(1,h-1));
+    if((h&1)===0){ const tx=Math.round(x+sway-1); bx.fillStyle='#5a3a1c'; bx.fillRect(tx,baseY-h-4,3,5); bx.fillStyle='#7a5226'; bx.fillRect(tx,baseY-h-4,1,5); }
+  }
   function drawWater(){
     let sky=bx.createLinearGradient(0,0,0,HZ);
     sky.addColorStop(0,'#0e2a4d'); sky.addColorStop(0.55,'#21527f'); sky.addColorStop(1,'#5b86b0');
     bx.fillStyle=sky; bx.fillRect(0,0,BASE_W,HZ);
     bx.fillStyle='rgba(255,255,255,0.10)';
     for(let i=0;i<4;i++){ const cxp=((i*101 + Math.floor(waterPhase*4)) % (BASE_W+80))-40; bx.fillRect(cxp, 26+i*16, 46, 7); }
-    bx.fillStyle='#16402c';
-    for(let x=0;x<BASE_W;x+=10){ const hh=12+((x*7)%11); bx.fillRect(x, HZ-hh, 10, hh); }
-    bx.fillStyle='#1d5a3a';
-    for(let x=6;x<BASE_W;x+=10){ const hh=7+((x*5)%8); bx.fillRect(x, HZ-hh, 6, hh); }
+    // ---- lush layered banks: 3 scrolling tree layers along the horizon ----
+    const veg=waterPhase*8;
+    function treeRow(step,base,amp,col,par){
+      bx.fillStyle=col;
+      for(let x=-step;x<BASE_W+step;x+=step){
+        const xx=x-((veg*par)%step);
+        const hh=base+((Math.abs((x*131)%17))/17*amp|0);
+        bx.fillRect(Math.round(xx), HZ-hh, step-1, hh);     // trunk/canopy block
+        bx.fillRect(Math.round(xx+2), HZ-hh-3, Math.max(2,step-5), 4); // rounded top
+      }
+    }
+    treeRow(16,18,12,'#123a26',0.4);
+    treeRow(12,14,10,'#1d5236',0.7);
+    treeRow(9, 10, 8,'#276e42',1.0);
+    // ---- grassy bank base + shade rows ----
     bx.fillStyle='#2f9a4a'; bx.fillRect(0,HZ,BASE_W,BASE_H-HZ);
     for(let y=HZ;y<BASE_H;y+=8){ bx.fillStyle=(((y/8)|0)&1)?'#2a8b42':'#36ab53'; bx.fillRect(0,y,BASE_W,4); }
+    // ---- scattered bushes/shrubs on both banks (scroll toward camera; carved by the water next) ----
+    const vegScroll=waterPhase*36, span=(BASE_H-HZ);
+    for(let i=0;i<44;i++){
+      const yy=HZ+6+((i*47+vegScroll)%span);
+      const t=Math.sqrt(Math.max(0,(yy-HZ)/(BASE_H+50-HZ)));
+      const hwv=halfW(t), cc=cxAt(t), l=cc-hwv, r=cc+hwv;
+      const sz=3+((t*16)|0), h1=hash(i);
+      const bxp=(i&1) ? (r+6 + h1*Math.max(0,BASE_W-r-10)) : (2 + h1*Math.max(0,l-10));
+      drawBush(Math.round(bxp), Math.round(yy), sz, (hash(i*3+1)*3)|0);
+    }
     for(let y=HZ;y<BASE_H;y++){
       const t=Math.sqrt(Math.max(0,(y-HZ)/(BASE_H+50-HZ)));
       const hw=halfW(t), cc=cxAt(t);
@@ -582,6 +752,16 @@
       }
       bx.fillStyle='#7a5a32'; bx.fillRect(l-3,y,3,1); bx.fillRect(r+1,y,3,1);   // muddy bank edge
       bx.fillStyle='#dff4ff'; bx.fillRect(l-1,y,1,1); bx.fillRect(r,y,1,1);     // foam line
+    }
+    // ---- reeds & cattails right at the waterline (drawn over the foam), swaying + scrolling ----
+    const reedScroll=waterPhase*40, rspan=(BASE_H-HZ);
+    for(let i=0;i<28;i++){
+      const yy=HZ+14+((i*53+reedScroll)%rspan);
+      const t=Math.sqrt(Math.max(0,(yy-HZ)/(BASE_H+50-HZ)));
+      const hwv=halfW(t), cc=cxAt(t), l=cc-hwv, r=cc+hwv;
+      const hsz=4+((t*18)|0);
+      const x=(i&1) ? r+2+(hash(i)*4) : l-2-(hash(i)*4);
+      drawReed(Math.round(x), Math.round(yy), hsz, yy*0.1+waterPhase*4+i);
     }
   }
 
@@ -635,9 +815,31 @@
     drawFlame(Math.round(x+18), Math.round(y+38), hot);
   }
 
+  function drawHawks(){
+    const bY=yAt(0.9)-12;
+    for(const hk of G.hawks){
+      if(hk.dead) continue;
+      const prog=Math.max(0,Math.min(1,(hk.y-(HZ-8))/(bY-(HZ-8))));
+      const sc=0.7+prog*1.9;
+      if(hk.t<0.9){                                  // red targeting blink during the telegraph
+        bx.globalAlpha=0.45+0.45*Math.sin(G.t*18); bx.strokeStyle='#ff5566'; bx.lineWidth=2;
+        bx.beginPath(); bx.arc(hk.x, hk.y, 11, 0, Math.PI*2); bx.stroke(); bx.globalAlpha=1;
+      }
+      bx.fillStyle='rgba(8,20,40,0.18)';
+      bx.fillRect(Math.round(hk.x-8*sc), Math.round(hk.y+9*sc), Math.round(16*sc), 2);
+      drawSprite((Math.floor(G.t*9)%2)?SPR_HAWK_B:SPR_HAWK_A, hk.x, hk.y, sc);
+    }
+  }
+  function drawProjectiles(){
+    for(const pr of G.projectiles){
+      if(pr.dead) continue;
+      const sp=1.0+0.25*Math.sin(pr.t*22);           // spin-ish wobble
+      drawSprite(SPR_CHICKEN, pr.x, pr.y, 1.2*sp, 1.2/sp);
+    }
+  }
   function render(){
     bx.clearRect(0,0,BASE_W,BASE_H);
-    drawWater(); drawItems(); drawBoat(); drawPops();
+    drawWater(); drawItems(); drawHawks(); drawBoat(); drawProjectiles(); drawPops();
     let sx=offX, sy=offY;
     if(G.shake>0){ sx+=(Math.random()*2-1)*viewScale; sy+=(Math.random()*2-1)*viewScale; }
     sctx.fillStyle='#05060f'; sctx.fillRect(0,0,screen.width,screen.height);
@@ -699,12 +901,17 @@
     const on=e=>{ e.preventDefault(); AudioFX.ensure(); AudioFX.resume(); doJump(); };
     b.addEventListener('pointerdown',on); b.addEventListener('touchstart',on,{passive:false});
   })();
+  (function bindThrow(){ const b=$('btnThrow');
+    const on=e=>{ e.preventDefault(); AudioFX.ensure(); AudioFX.resume(); doThrow(); };
+    b.addEventListener('pointerdown',on); b.addEventListener('touchstart',on,{passive:false});
+  })();
 
   window.addEventListener('keydown', e=>{
     if(e.key===' '||e.key==='ArrowUp'||e.key==='ArrowDown') e.preventDefault();
     if(e.key==='ArrowLeft'||e.key==='a'){ held.left=true; }
     else if(e.key==='ArrowRight'||e.key==='d'){ held.right=true; }
     else if(e.key==='ArrowUp'||e.key==='w'){ doJump(); }
+    else if(e.key==='f'||e.key==='F'||e.key==='Shift'){ doThrow(); }
     else if(e.key===' '||e.key==='Enter'){ if(G.state==='play') doJump(); else if(G.state==='title'||G.state==='over') startGame(); }
   });
   window.addEventListener('keyup', e=>{

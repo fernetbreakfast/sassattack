@@ -1007,8 +1007,8 @@
       hk.t += dt;
       // DODGEABLE: only track the boat GENTLY during the telegraph; once it commits to the dive it flies
       // straight, so steering left/right can actually get you out of the way (dodge OR throw a chicken).
-      if(hk.t<0.95){ hk.x += (bScreenX-hk.x)*Math.min(1, dt*0.22); }
-      hk.y += (hk.t<0.95 ? 64 : 250)*dt;                     // telegraphed approach, then a fast close dive
+      if(hk.t<1.6){ hk.x += (bScreenX-hk.x)*Math.min(1, dt*0.22); }
+      hk.y += (hk.t<1.6 ? 40 : 120)*dt;                      // SLOWER: longer hover/telegraph (1.6s) + a gentle dive (120) so there's a real window to throw a chicken at it (was 0.95s telegraph @64 + fast 250 dive)
       if(!hk.struck && hk.y>=bY-12){
         hk.struck=true; hk.dead=true;
         const dx=Math.abs(hk.x - xAt(G.boatX,0.9));          // must STILL be aligned at impact -> dodge by steering away

@@ -742,7 +742,7 @@
 
   /* ----- echoed "oh no" game-over voice clip (HTMLAudio; like the cutscene mp3s) ----- */
   let _ohNo=null;
-  function getOhNo(){ try{ if(!_ohNo){ _ohNo=new Audio('snd/realohno.mp3'); _ohNo.preload='auto'; } return _ohNo; }catch(e){ return null; } }
+  function getOhNo(){ try{ if(!_ohNo){ _ohNo=new Audio('snd/ng_03.mp3'); _ohNo.preload='auto'; } return _ohNo; }catch(e){ return null; } }   // ng_03 = game-over "oh no" voice clip
   // Play once as the game-over signal. Gated on the voice toggle AND an unlocked audio
   // context (same gate the rest of NG's audio relies on); fully wrapped so it never throws.
   function playOhNo(){

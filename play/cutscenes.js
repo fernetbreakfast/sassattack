@@ -451,8 +451,8 @@ const SCENES=[
 const BYID={}; SCENES.forEach(s=>{ if(!s.grp) BYID[s.id]=s; });
 let current=null;
 /* ---------- spoken captions ---------- */
-function getChaseAudio(){ if(!chaseAudio){ chaseAudio=new Audio('snd/chase.mp3'); chaseAudio.preload='auto'; } return chaseAudio; }
-function getAudienceAudio(){ if(!audienceAudio){ audienceAudio=new Audio('snd/audience.mp3'); audienceAudio.preload='auto'; } return audienceAudio; }
+function getChaseAudio(){ if(!chaseAudio){ chaseAudio=new Audio('snd/ng_01.mp3'); chaseAudio.preload='auto'; } return chaseAudio; }   // ng_01 = "The Chase" gonna-git-ya clip
+function getAudienceAudio(){ if(!audienceAudio){ audienceAudio=new Audio('snd/ng_02.mp3'); audienceAudio.preload='auto'; } return audienceAudio; }   // ng_02 = "The Audience" oh-she-wet boss clip
 function duckMusic(on){
   try{ if(musicGain){ const A=ac(); const g=musicGain.gain;
     if(A){ g.cancelScheduledValues(A.currentTime); g.linearRampToValueAtTime(on?0.22:1.0,A.currentTime+0.08); }
@@ -464,7 +464,7 @@ function speak(txt){
   duckMusic(true);
   const done=()=>duckMusic(false);
   // Scene 2 ('audience') plays a custom voice recording; every other scene
-  // (including 'chase') uses the TTS robot voice. snd/chase.mp3 stays unused.
+  // (including 'chase') uses the TTS robot voice. snd/ng_01.mp3 stays unused.
   if(current&&current.id==='audience'){
     try{ const a=getAudienceAudio(); a.muted=false; a.currentTime=0; a.onended=done; a.onerror=done;
       const pr=a.play(); if(pr&&pr.catch)pr.catch(done);

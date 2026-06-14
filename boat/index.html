@@ -213,7 +213,7 @@
     function resume(){ try{ if(ctx && ctx.state!=='running') ctx.resume(); }catch(e){} }
     // custom processed chicken pickup clip via <audio>; only plays once the ctx is unlocked + not muted
     let chickEl=null;
-    try{ chickEl=new Audio('/boat/snd/chickpick.mp3'); chickEl.preload='auto'; chickEl.load(); }catch(e){ chickEl=null; }
+    try{ chickEl=new Audio('/boat/snd/chuckachicken_01.mp3'); chickEl.preload='auto'; chickEl.load(); }catch(e){ chickEl=null; }   // chuckachicken_01 = chicken-pickup clip
     function chickpick(){
       if(muted || !ctx || !chickEl) return;
       try{ const c=(typeof chickEl.cloneNode==='function') ? chickEl.cloneNode() : chickEl;

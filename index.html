@@ -78,11 +78,11 @@
   <script>
   (() => {
     'use strict';
-    // Play /sample.mp3 (the echoed chase clip) on game selection, then navigate once it ends.
+    // Play /snd/menu_01.mp3 (menu_01 = the echoed chase clip) on game selection, then navigate once it ends.
     // Page navigation stops audio, so hold the link until the audio 'ended' event (or a
     // fallback timeout) before following it. Audio is unlocked inside the tap gesture so
     // mobile browsers allow playback; if it can't play, navigate immediately.
-    const SAMPLE = '/sample.mp3';
+    const SAMPLE = '/snd/menu_01.mp3';   // menu_01 = echoed chase clip (menu tap sound)
     const FALLBACK_MS = 2500;
     let audio = null;
     try { audio = new Audio(SAMPLE); audio.preload = 'auto'; } catch (e) { audio = null; }

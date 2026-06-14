@@ -813,11 +813,18 @@
     const h={'Content-Type':'application/json','X-Score-Token':SCORE_TOKEN};
     const runId=Date.now().toString(36)+Math.random().toString(36).slice(2,10);
     const body=JSON.stringify({ score:Math.round(score), initials:ini, run_id:runId, mode:'', game:GAME });
+    const sc=Math.round(score);
     let r;
     try{ r=await fetchT(SCORES_ENDPOINT,{method:'POST',headers:h,body}); }
-    catch(e){ console.error('[boat] leaderboard POST failed (network/CORS/timeout):', e); setSaveStatus('⚠ save failed: '+(e&&e.message||'network'),'err'); return; }
+    catch(e){
+      console.error('[boat] leaderboard POST failed (network/CORS/timeout):', e);
+      setSaveStatus('⚠ save failed: '+(e&&e.message||'network'),'err');
+      try{ window.alert('SAVE FAILED: '+(e&&(e.name+': '+e.message)||e)); }catch(_){}   // TEMP unmissable diagnostic
+      return;
+    }
     let txt=''; try{ txt=await r.text(); }catch(_){}
     console.log('[boat] leaderboard POST ->', r.status, r.statusText, '| body:', body, '| response:', String(txt).slice(0,300));
+    try{ window.alert('SAVE: '+r.status+' '+r.statusText+'  | game='+GAME+'  | score='+sc+'  | initials='+ini); }catch(_){}  // TEMP unmissable diagnostic
     if(r.ok) setSaveStatus('✓ Score saved to leaderboard','ok');
     else setSaveStatus('⚠ save failed: '+r.status+(r.statusText?(' '+r.statusText):''),'err');
     // also fire the global hi-score post (best-effort; does NOT affect the leaderboard row)
@@ -1460,9 +1467,18 @@
   const LSL_CHANCE = 1/7;   // ~0.1428 -> roughly 1 in 7 games shows the LSL trivia
   function endRun(){
     G.state='over'; AudioFX.stopBed();
-    // LSL TRIVIA GATE -> a correct answer unlocks the Kickin Chicken bonus round
-    if(Math.random() < LSL_CHANCE){ startTrivia(); }
-    else { finalizeRun(); }
+    // LSL TRIVIA GATE -> a correct answer unlocks the Kickin Chicken bonus round.
+    // Guarded: if the trivia/bonus kickoff throws for any reason, fall through to finalizeRun so the
+    // score still POSTs (and the alert still fires) — the save is never stranded.
+    try{
+      if(Math.random() < LSL_CHANCE){ startTrivia(); }
+      else { finalizeRun(); }
+    }catch(e){
+      console.error('[boat] end-of-run sequence threw — forcing save:', e);
+      try{ finalizeRun(); }
+      catch(e2){ console.error('[boat] finalizeRun also threw — saving directly:', e2);
+        saveBoatScore(Math.floor(G.score), (players[cur]&&players[cur].ini)||'AAA'); }
+    }
   }
   // record the final score (incl. any bonus), post to the boat board, then continue the normal flow
   function finalizeRun(){
@@ -1548,11 +1564,13 @@
   }
   function answerTrivia(correct, btn, wrap, correctIdx){
     if(trivLock) return; trivLock=true;
-    const kids=wrap.children;
-    kids[correctIdx].classList.add('right');
-    if(!correct){ btn.classList.add('wrong'); }
-    if(correct){ AudioFX.bonus(); setTimeout(startKick, 650); }      // correct -> Kickin Chicken bonus round
-    else { AudioFX.missfx(); setTimeout(finalizeRun, 900); }         // wrong -> skip bonus, normal game-over
+    try{
+      const kids=wrap.children;
+      kids[correctIdx].classList.add('right');
+      if(!correct){ btn.classList.add('wrong'); }
+      if(correct){ AudioFX.bonus(); setTimeout(()=>{ try{ startKick(); }catch(e){ console.error('[boat] startKick threw — saving:', e); finalizeRun(); } }, 650); }  // correct -> Kickin Chicken bonus
+      else { AudioFX.missfx(); setTimeout(finalizeRun, 900); }       // wrong -> skip bonus, normal game-over (saves)
+    }catch(e){ console.error('[boat] answerTrivia threw — forcing save:', e); finalizeRun(); }
   }
 
   // ---- KICKIN CHICKEN: single-button timing skill-shot. Marker oscillates; tap when it's in the green. ----
